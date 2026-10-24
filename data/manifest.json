@@ -1,0 +1,20 @@
+{
+ "about":"題庫目錄。網頁依 files 的順序載入；新增檔案時加在這裡。v 是內容雜湊（python tools/update_manifest.py 會自動更新）。",
+ "files":[
+  {"path":"tags.json","title":"所有考點標籤（錯題分析依這裡的順序顯示）","v":"1d7243ef","exams":[]},
+  {"path":"stat_past.json","title":"統計學 考古題","v":"0f1bf610","exams":["s104","s105","s106","s107","s108","s109","s110","s111","s112","s113","s115"]},
+  {"path":"toeic_p5_mock.json","title":"TOEIC Part 5 綜合模擬與早期專項特訓","v":"7ba65315","exams":["toeic_p5_full","toeic_p5_grammar","toeic_p5_vocab","toeic_p5_pos","toeic_p5_conn"]},
+  {"path":"toeic_p5_s1.json","title":"TOEIC Part 5 第一階段：保底秒殺題","v":"c0a6f185","exams":["p5_pos","p5_conj","p5_pron"]},
+  {"path":"toeic_p5_s2.json","title":"TOEIC Part 5 第二階段：動詞檢查","v":"c0be0bb9","exams":["p5_fin","p5_voice","p5_tense"]},
+  {"path":"toeic_p5_s3.json","title":"TOEIC Part 5 第三階段：搭配與語意","v":"67238bca","exams":["p5_chunk","p5_vocab"]},
+  {"path":"toeic_p5_adv.json","title":"TOEIC Part 5 進階考點（stage 4–6）","v":"33ab3406","exams":["p5_qty","p5_det","p5_indef","p5_noun","p5_agree","p5_rel","p5_ncl","p5_cadv","p5_corr","p5_inv","p5_subj","p5_comp","p5_deg","p5_prep","p5_adv","p5_part","p5_ger","p5_caus"]},
+  {"path":"toeic_p6.json","title":"TOEIC Part 6 段落填空","v":"4517216f","exams":["p6_1","p6_2","p6_3","p6_4","p6_5","p6_6","p6_7","p6_8","p6_9","p6_10","p6_11","p6_12","p6_13","p6_14","p6_15","p6_16","p6_17"]},
+  {"path":"toeic_part7.json","title":"TOEIC Part 7 閱讀測驗","v":"771ecf89","exams":["p7_t1","p7_t2","p7_t3","p7_t4","p7_x2","p7_5"]},
+  {"path":"bigdata_past.json","title":"巨量資料概論 考古題","v":"572106f9","exams":["p104","p105","p106","p107","p108","p109","p110","p111","p112","p113","p115"]},
+  {"path":"bigdata_mock.json","title":"巨量資料概論 模擬考","v":"2203c379","exams":["e1","e2","e3"]},
+  {"path":"ai_jr.enc.json","title":"AI應用規劃師 初級（iPAS 能力鑑定指南 第一篇～第七篇 章節模擬試題）","v":"ce9e9c0d","exams":["ai_jr_p1c1","ai_jr_p1c2","ai_jr_p2c1","ai_jr_p2c2","ai_jr_p2c3","ai_jr_p3c1","ai_jr_p3c2","ai_jr_p4c1","ai_jr_p4c2","ai_jr_p5c1","ai_jr_p5c2","ai_jr_p6c1","ai_jr_p6c2","ai_jr_p7c1","ai_jr_p7c2","ai_jr_p7c3"],"enc":1},
+  {"path":"ai_sr_common.enc.json","title":"AI應用規劃師 中級．科目一 人工智慧技術應用與規劃（必考共同科目）","v":"bcec8c05","exams":["ai_sr_c1","ai_sr_c2","ai_sr_c3","ai_sr_c4","ai_sr_c5","ai_sr_c6","ai_sr_c7","ai_sr_c8","ai_sr_c9"],"enc":1},
+  {"path":"ai_sr_ml.enc.json","title":"AI應用規劃師 中級．科目三 機器學習技術與應用（與科目二擇一）","v":"48064026","exams":["ai_sr_ml1","ai_sr_ml2","ai_sr_ml3","ai_sr_ml4","ai_sr_ml5","ai_sr_ml6","ai_sr_ml7","ai_sr_ml8","ai_sr_ml9","ai_sr_ml10","ai_sr_ml11","ai_sr_ml12"],"enc":1},
+  {"path":"ai_sr_bd.enc.json","title":"AI應用規劃師 中級．科目二 大數據處理分析與應用（與科目三擇一）","v":"9a9e7841","exams":["ai_sr_bd1","ai_sr_bd2","ai_sr_bd3","ai_sr_bd4","ai_sr_bd5","ai_sr_bd6","ai_sr_bd7","ai_sr_bd8","ai_sr_bd9","ai_sr_bd10","ai_sr_bd11","ai_sr_bd12","ai_sr_bd13"],"enc":1}
+ ]
+}
