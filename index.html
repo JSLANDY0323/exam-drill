@@ -16,18 +16,18 @@
 <style>
 :root{
   --bg:#FFFFFF; --ink:#111111; --muted:#6B6B6B; --faint:#A3A3A3; --line:#E7E7E7; --soft:#F6F6F6;
-  --mid:#9A9A9A; --on-ink:#FFFFFF;
+  --mid:#9A9A9A; --on-ink:#FFFFFF; --hl:rgba(250,204,21,.38);
   color-scheme:light;
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
     --bg:#0F0F0F; --ink:#F2F2F2; --muted:#A3A3A3; --faint:#666666; --line:#262626; --soft:#181818;
-    --mid:#5C5C5C; --on-ink:#0F0F0F; color-scheme:dark;
+    --mid:#5C5C5C; --on-ink:#0F0F0F; --hl:rgba(250,204,21,.26); color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
   --bg:#0F0F0F; --ink:#F2F2F2; --muted:#A3A3A3; --faint:#666666; --line:#262626; --soft:#181818;
-  --mid:#5C5C5C; --on-ink:#0F0F0F; color-scheme:dark;
+  --mid:#5C5C5C; --on-ink:#0F0F0F; --hl:rgba(250,204,21,.26); color-scheme:dark;
 }
 *,*::before,*::after{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-padding-top:64px}
@@ -134,11 +134,20 @@ body.readmode .topbar-in{max-width:1320px}
 .pane-r .result{margin:0 0 4px}
 .pane-r .nav{margin-top:14px}
 .pane-r .tools{margin-top:16px}
+/* 檢討時右側切換「題目檢討／全文翻譯」；.sg 是逐句對照的一句，兩側同一句一起標示 */
+.ptabs{position:sticky;top:-16px;z-index:2;display:flex;gap:6px;margin:-16px -18px 14px;padding:10px 18px;background:var(--bg);border-bottom:1px solid var(--line)}
+.ptabs button{appearance:none;border:1px solid var(--line);background:var(--bg);color:var(--muted);border-radius:999px;padding:5px 14px;font-size:.85rem;cursor:pointer}
+.ptabs button.on{background:var(--ink);border-color:var(--ink);color:var(--on-ink)}
+.trhint{margin:0 0 12px}
+.trdoc{background:var(--soft)}
+.sg{border-radius:3px;transition:background-color .12s,box-shadow .12s;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.sg.on{background:var(--hl);box-shadow:0 0 0 2px var(--hl)}
 @media (max-width:860px){
   .wrap.readmode{padding:10px 12px 10px}
   .rhead h1{font-size:1.05rem;margin-bottom:6px}
   .reading{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) minmax(0,1fr);gap:10px}
   .pane-l,.pane-r{padding:12px 14px}
+  .ptabs{top:-12px;margin:-12px -14px 12px;padding:8px 14px}
   .doc{padding:12px;font-size:.92rem}
 }
 .syncdot{width:7px;height:7px;border-radius:50%;border:1.5px solid var(--faint)}
@@ -1100,7 +1109,31 @@ function vUnlock(){
 /* ---------- 作答 ---------- */
 const backHome=`<button class="back" data-act="go" data-v="home">← 目錄</button>`;
 /* ---------- Part 7 閱讀分欄：左文章、右題組；整組選完才交卷檢討 ---------- */
-let p7ResetR=false;
+let p7ResetR=false,p7Tab="q";
+/* 逐句對照翻譯（資料欄位 seg／hseg，見 tools/p7_trans.py）：英文依序切開原文，中文照英文的換行排段落；對不上原文就回傳 null */
+function segPair(src,seg,key){
+  if(!Array.isArray(seg)||!seg.length)return null;
+  let pos=0,l="",r="";
+  for(let k=0;k<seg.length;k++){const en=seg[k][0],zh=seg[k][1],i=src.indexOf(en,pos);
+    if(i<0||src.slice(pos,i).trim())return null;
+    const gap=src.slice(pos,i);
+    l+=esc(gap)+`<span class="sg" data-s="${key}-${k}">${esc(en)}</span>`;
+    r+="\n".repeat((gap.match(/\n/g)||[]).length)+`<span class="sg" data-s="${key}-${k}">${esc(zh)}</span>`;
+    pos=i+en.length}
+  return src.slice(pos).trim()?null:{l:l+esc(src.slice(pos)),r}}
+// 滑到（或點）任一側的句子：兩側同一句一起標示，另一側不在視野內就捲過去
+function segHL(el,scroll){
+  app.querySelectorAll(".sg.on").forEach(x=>x.classList.remove("on"));
+  if(!el)return;
+  const pair=[...app.querySelectorAll(`.sg[data-s="${el.dataset.s}"]`)];if(pair.length<2)return;
+  pair.forEach(x=>x.classList.add("on"));
+  const other=pair.find(x=>x!==el),pane=scroll&&other.closest(".pane-l,.pane-r");if(!pane)return;
+  const r=other.getBoundingClientRect(),pr=pane.getBoundingClientRect();
+  if(r.top<pr.top+40||r.bottom>pr.bottom-8)pane.scrollTo({top:pane.scrollTop+r.top-pr.top-pane.clientHeight/3,
+    behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"})}
+app.addEventListener("mouseover",e=>{const el=e.target.closest(".sg");if(el&&!el.classList.contains("on"))segHL(el,true)});
+app.addEventListener("mouseout",e=>{const el=e.target.closest(".sg");if(el&&!(e.relatedTarget&&el.contains(e.relatedTarget)))segHL(null)});
+app.addEventListener("click",e=>{const el=e.target.closest(".sg");if(el)segHL(el,true)});
 function p7Sets(ex){const m=new Map();ex.qs.forEach((q,i)=>{const k=q.p||0;if(!m.has(k))m.set(k,[]);m.get(k).push(i)});return [...m.entries()].map(([p,idx])=>({p,idx}))}
 function p7Status(ex,set){const ids=set.idx.map(i=>ex.id+"-"+i);const d=ids.filter(id=>st.ans[id]!==undefined).length;
   return {done:d===ids.length,d,n:ids.length,ok:ids.filter(id=>st.ans[id]!==undefined&&okAns(QM[id].q,st.ans[id])).length}}
@@ -1118,15 +1151,23 @@ function vReading(){
     const id=ex.id+"-"+qi,qq=ex.qs[qi],a=st.ans[id],dv=st.p7d[id];
     if(review)return `<span class="blank done ${a===qq.a?"":"miss"}" id="blank-${n}" data-act="jumpq" data-n="${n}"><sup class="bn">${n}</sup>${esc(qq.o[qq.a])}</span>`;
     return `<span class="blank6" id="blank-${n}" data-act="jumpq" data-n="${n}"><sup class="bn">${n}</sup>-------</span>`});
-  const docs=(P.docs&&P.docs.length?P.docs:[{kind:"",head:P.head,text:P.text}]).map(d=>
-    `<div class="doc">${d.head?`<p class="p-head">${esc(d.head)}</p>`:""}<div class="p-body">${isP6?blanks(d.text):esc(d.text||"")}</div></div>`).join("");
+  const dl=P.docs&&P.docs.length?P.docs:[{kind:"",head:P.head,text:P.text,seg:P.seg,hseg:P.hseg}];
+  // 交卷後才有全文翻譯；每一篇都對得上原文才啟用，否則沿用舊的整段 trans
+  const tr=review&&!isP6?dl.map((d,di)=>({b:segPair(d.text||"",d.seg,"t"+di),h:d.head?segPair(d.head,d.hseg,"h"+di):null})):null;
+  const hasTr=!!tr&&tr.every(x=>x.b),tab=hasTr?p7Tab:"q";
+  const docs=dl.map((d,di)=>{const t=hasTr?tr[di]:null;
+    return `<div class="doc">${d.head?`<p class="p-head">${t&&t.h?t.h.l:esc(d.head)}</p>`:""}<div class="p-body">${t?t.b.l:isP6?blanks(d.text):esc(d.text||"")}</div></div>`}).join("");
   const DIRS={6:"Directions: Read the texts that follow. A word, phrase, or sentence is missing in parts of each text. Four answer choices for each question are given below the text. Select the best answer to complete the text. Then mark the letter (A), (B), (C), or (D) on your answer sheet.",
     7:"Directions: In this part you will read a selection of texts, such as magazine and newspaper articles, e-mails, and instant messages. Each text or set of texts is followed by several questions. Select the best answer for each question and mark the letter (A), (B), (C), or (D) on your answer sheet."};
   let h=`<div class="rhead">${backHome}<h1>${esc(ex.title)}</h1><div class="setnav">${nav}</div></div>
   <div class="reading"><div class="pane-l" id="paneL" data-key="${ex.id}:${si}"><p class="dirs">${DIRS[ex.part]||""}</p><p class="pane-title">${esc(P.en||P.kind||"")}</p>${docs}
-  ${review&&P.trans?`<details class="ptrans"><summary>全文翻譯</summary><p>${esc(P.trans)}</p></details>`:""}</div>
+  ${review&&P.trans&&!hasTr?`<details class="ptrans"><summary>全文翻譯</summary><p>${esc(P.trans)}</p></details>`:""}</div>
   <div class="pane-r" id="paneR">`;
-  set.idx.forEach(i=>{
+  if(hasTr)h+=`<div class="ptabs" role="tablist">${[["q","題目檢討"],["tr","全文翻譯"]].map(([k,n])=>
+    `<button role="tab" aria-selected="${tab===k}" class="${tab===k?"on":""}" data-act="p7tab" data-t="${k}">${n}</button>`).join("")}</div>`;
+  if(tab==="tr")h+=`<p class="note trhint">滑鼠移到英文句子上，這裡會標示對應的翻譯；手機可以直接點句子。</p>`+
+    dl.map((d,di)=>`<div class="doc trdoc">${d.kind?`<p class="p-kind">${esc(d.kind)}</p>`:""}${d.head?`<p class="p-head">${tr[di].h?tr[di].h.r:esc(d.head)}</p>`:""}<div class="p-body">${tr[di].b.r}</div></div>`).join("");
+  else set.idx.forEach(i=>{
     const id=ex.id+"-"+i,q=ex.qs[i],a=st.ans[id],locked=a!==undefined,sel=locked?a:st.p7d[id],fl=!!st.flags[id];
     h+=`<div class="rq" id="rq-${qn(i)}"><div class="qtop"><span class="qno">${isP6?`<button class="linkbtn qlocate" data-act="jumpblank" data-n="${qn(i)}" title="Locate blank">${qn(i)}.</button>`:`${qn(i)}.`}${review?`<span class="chip">${TAGS[q.g]?TAGS[q.g].n:""}</span>`:""}</span>
       <div class="qactions"><button class="flagbtn ${fl?"on":""}" data-act="flag" data-id="${id}" aria-pressed="${fl}">${fl?"已標註":"標註"}</button></div></div>
@@ -1497,6 +1538,7 @@ document.addEventListener("click",e=>{
     case"chartFirst":st.chartFirst=d.v==="1";persist();render();return;
     case"jumpblank":{const el=document.getElementById("blank-"+d.n),pl=document.getElementById("paneL");
       if(el&&pl){pl.scrollTop+=el.getBoundingClientRect().top-pl.getBoundingClientRect().top-pl.clientHeight/3;el.classList.add("flash");setTimeout(()=>el.classList.remove("flash"),1200)}return}
+    case"p7tab":p7Tab=d.t==="tr"?"tr":"q";p7ResetR=true;render();return;
     case"jumpq":{const el=document.getElementById("rq-"+d.n),pr=document.getElementById("paneR");
       if(el&&pr){pr.scrollTop+=el.getBoundingClientRect().top-pr.getBoundingClientRect().top-8}return}
     case"p7pick":if(!st.p7d||typeof st.p7d!=="object")st.p7d={};st.p7d[d.id]=+d.k;persist();render();return;
@@ -1507,7 +1549,7 @@ document.addEventListener("click",e=>{
       const ms=elapsedFor("set|"+ex.id+"|"+set.p),newIds=set.idx.map(i=>ex.id+"-"+i).filter(id=>st.ans[id]===undefined),per=ms!=null&&newIds.length?ms/newIds.length:null;
       newIds.forEach(id=>{setAns(id,st.p7d[id]);logTime(id,per,okAns(QM[id].q,st.p7d[id]),{src:"e",set:newIds.length,sm:ms==null?null:Math.round(ms)})});
       set.idx.forEach(i=>{delete st.p7d[ex.id+"-"+i]});QT.key=null;
-      p7ResetR=true;save();render();const r=document.getElementById("paneR");if(r)r.scrollTop=0;return}
+      p7ResetR=true;p7Tab="q";save();render();const r=document.getElementById("paneR");if(r)r.scrollTop=0;return}
     case"p7redo":{const sets=p7Sets(ex),cur=st.cur[ex.id]||0,set=sets.find(s=>s.idx.includes(cur))||sets[0];
       if(!confirm("清除這個題組的作答，重新作答？"))return;
       set.idx.forEach(i=>{delAns(ex.id+"-"+i);if(st.p7d)delete st.p7d[ex.id+"-"+i]});p7ResetR=true;save();render();
