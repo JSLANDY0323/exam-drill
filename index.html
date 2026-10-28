@@ -19,18 +19,18 @@
 <style>
 :root{
   --bg:#FFFFFF; --ink:#111111; --muted:#6B6B6B; --faint:#A3A3A3; --line:#E7E7E7; --soft:#F6F6F6;
-  --mid:#9A9A9A; --on-ink:#FFFFFF; --hl:rgba(250,204,21,.38);
+  --mid:#9A9A9A; --on-ink:#FFFFFF; --hl:rgba(250,204,21,.38); --gl:rgba(59,130,246,.16);
   color-scheme:light;
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
     --bg:#0F0F0F; --ink:#F2F2F2; --muted:#A3A3A3; --faint:#666666; --line:#262626; --soft:#181818;
-    --mid:#5C5C5C; --on-ink:#0F0F0F; --hl:rgba(250,204,21,.26); color-scheme:dark;
+    --mid:#5C5C5C; --on-ink:#0F0F0F; --hl:rgba(250,204,21,.26); --gl:rgba(96,165,250,.28); color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
   --bg:#0F0F0F; --ink:#F2F2F2; --muted:#A3A3A3; --faint:#666666; --line:#262626; --soft:#181818;
-  --mid:#5C5C5C; --on-ink:#0F0F0F; --hl:rgba(250,204,21,.26); color-scheme:dark;
+  --mid:#5C5C5C; --on-ink:#0F0F0F; --hl:rgba(250,204,21,.26); --gl:rgba(96,165,250,.28); color-scheme:dark;
 }
 *,*::before,*::after{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-padding-top:64px}
@@ -145,6 +145,20 @@ body.readmode .topbar-in{max-width:1320px}
 .trdoc{background:var(--soft)}
 .sg{border-radius:3px;transition:background-color .12s,box-shadow .12s;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 .sg.on{background:var(--hl);box-shadow:0 0 0 2px var(--hl)}
+/* 檢討畫面的單字／片語提示（glossHTML）：片語加細虛線，滑到的字與所在片語上色 */
+.gw{cursor:help;border-radius:2px}
+.gp{border-bottom:1px dotted var(--faint);-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.gw.on,.gp.on{background:var(--gl)}
+.gp.on{border-bottom-color:var(--ink)}
+.gltip{position:fixed;z-index:1000;max-width:min(320px,calc(100vw - 16px));padding:9px 12px;border-radius:10px;background:var(--ink);color:var(--on-ink);
+  font-size:.84rem;line-height:1.6;white-space:pre-line;box-shadow:0 6px 24px rgba(0,0,0,.18)}
+.gltip .gt-acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;white-space:normal}
+.gltip .gt-acts button{appearance:none;border:1px solid currentColor;background:none;color:inherit;border-radius:999px;padding:3px 10px;font-size:.78rem;cursor:pointer}
+.gltip .gt-acts button:hover:not(:disabled){background:var(--on-ink);color:var(--ink)}
+.gltip .gt-acts button:disabled{opacity:.55;cursor:default}
+.gltip[hidden]{display:none}
+.gltip .gt-k{opacity:.65;font-size:.78rem}
+.gltip .gt-sep{display:block;height:1px;margin:6px 0;background:currentColor;opacity:.25}
 @media (max-width:860px){
   .wrap.readmode{padding:10px 12px 10px}
   .rhead h1{font-size:1.05rem;margin-bottom:6px}
@@ -366,6 +380,26 @@ code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85em;backgroun
 .speed{border:1px solid var(--ink);border-radius:10px;padding:14px 16px;margin:14px 0 4px;font-size:.95rem}
 .speed b{font-variant-numeric:tabular-nums}
 .toprow .name{font-weight:700;font-size:1.08rem}
+/* 單字卡 */
+.vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin:10px 0 18px}
+.vcard{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;background:var(--bg);min-width:0}
+.vc-face{appearance:none;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:6px;
+  min-height:120px;padding:14px 16px 12px;border-radius:12px 12px 0 0}
+.vc-face:hover,.vcard.flip .vc-face{background:var(--soft)}
+.vc-top{display:flex;align-items:center;gap:6px;font-size:.74rem;color:var(--muted)}
+.vc-type{border:1px solid var(--line);border-radius:999px;padding:0 8px}
+.vc-ok{margin-left:auto;color:var(--ink);font-weight:600}
+.vc-word{font-size:1.25rem;font-weight:700;line-height:1.3;overflow-wrap:anywhere}
+.vc-hint{margin-top:auto;font-size:.8rem;color:var(--faint)}
+.vc-mean{white-space:pre-line;font-size:.9rem;line-height:1.6}
+.vc-ex{font-size:.84rem;line-height:1.6;color:var(--muted)}
+.vc-ex mark{background:var(--hl);color:inherit;border-radius:2px;padding:0 1px}
+.vc-note{margin:0 16px 6px;padding:8px 10px;border-radius:8px;background:var(--soft);font-size:.84rem;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.vnote-in{display:block;margin:0 16px 6px;width:calc(100% - 32px);font:inherit;font-size:.86rem;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--bg);color:var(--ink);resize:vertical}
+.vc-acts{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin-top:auto;padding:9px 16px 12px;border-top:1px solid var(--line);font-size:.8rem}
+.vc-src{color:var(--muted);text-align:left}
+.vc-btns{display:flex;gap:12px;margin-left:auto}
+.vcard.done{border-color:var(--mid)}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px}
 .chips button{appearance:none;border:1px solid var(--line);background:var(--bg);color:var(--muted);border-radius:999px;padding:5px 12px;font-size:.82rem;cursor:pointer}
 .chips button.on{border-color:var(--ink);background:var(--ink);color:var(--on-ink)}
@@ -448,9 +482,9 @@ async function loadData(){
 const qNo=id=>{const {i,q}=QM[id];return q.n||i+1};
 const qLabel=id=>QM[id].ex.title+" 第 "+qNo(id)+" 題";
 const findEx=id=>ALL.find(e=>e.id===id)||ALL[0];
-const VIEWS=["home","exam","pset","prac","report","sync","stats","notes"];
+const VIEWS=["home","exam","pset","prac","report","sync","stats","notes","vocab"];
 
-let st={view:"home", scope:"bigdata", exam:"toeic_p5_full", open:{}, sheetOpen:null, cur:{}, ans:{}, flags:{}, pr:null, ansT:{}, flagT:{}, curT:{}, tlog:[], notes:{}, noteT:{}, nrev:{}, nrevT:{}};
+let st={view:"home", scope:"bigdata", exam:"toeic_p5_full", open:{}, sheetOpen:null, cur:{}, ans:{}, flags:{}, pr:null, ansT:{}, flagT:{}, curT:{}, tlog:[], notes:{}, noteT:{}, nrev:{}, nrevT:{}, vocab:{}, vocabT:{}};
 
 const EXAM_MIGRATE={"p5_pos_1": ["p5_pos", 0], "p5_pos_2": ["p5_pos", 20], "p5_pos_3": ["p5_pos", 40], "p5_pos_4": ["p5_pos", 60], "p5_conj_1": ["p5_conj", 0], "p5_conj_2": ["p5_conj", 15], "p5_conj_3": ["p5_conj", 30], "p5_conj_4": ["p5_conj", 45], "p5_pron_2": ["p5_pron", 25], "p5_fin_2": ["p5_fin", 25], "p5_voice_2": ["p5_voice", 25], "p5_tense_2": ["p5_tense", 25], "p5_chunk_1": ["p5_chunk", 0], "p5_chunk_2": ["p5_chunk", 20], "p5_chunk_3": ["p5_chunk", 40], "p5_chunk_4": ["p5_chunk", 60], "p5_vocab_1": ["p5_vocab", 0], "p5_vocab_2": ["p5_vocab", 15], "p5_vocab_3": ["p5_vocab", 30], "p5_vocab_4": ["p5_vocab", 45]};
 // 舊題組（例如 詞性題 1～4）合併後，把「舊題組-題號」轉成「新題組-題號」，保留作答、標註與進度
@@ -471,7 +505,7 @@ function migCur(c,t){let ch=false;
   return ch}
 function migrateData(o){
   if(!o||typeof o!=="object")return false;
-  ["ans","ansT","flags","flagT","cur","curT","notes","noteT","nrev","nrevT"].forEach(k=>{if(!o[k]||typeof o[k]!=="object")o[k]={}});
+  ["ans","ansT","flags","flagT","cur","curT","notes","noteT","nrev","nrevT","vocab","vocabT"].forEach(k=>{if(!o[k]||typeof o[k]!=="object")o[k]={}});
   let ch=migPair(o.ans,o.ansT);ch=migPair(o.flags,o.flagT)||ch;ch=migCur(o.cur,o.curT)||ch;
   return ch;
 }
@@ -491,7 +525,7 @@ function load(){
       if(o&&o.ans){Object.keys(o.ans).forEach(k=>{if(st.ans["e1-"+k]===undefined)st.ans["e1-"+k]=o.ans[k]});if(st.cur.e1===undefined)st.cur.e1=o.cur||0}}catch(e){}
     st.migratedV1=true;
   }
-  ["ansT","flagT","curT","open","notes","noteT","nrev","nrevT"].forEach(k=>{if(!st[k]||typeof st[k]!=="object")st[k]={}});
+  ["ansT","flagT","curT","open","notes","noteT","nrev","nrevT","vocab","vocabT"].forEach(k=>{if(!st[k]||typeof st[k]!=="object")st[k]={}});
   if(!Array.isArray(st.tlog))st.tlog=[];pruneTlog();
   Object.keys(st.ans).forEach(k=>{if(!st.ansT[k])st.ansT[k]=1});
   Object.keys(st.flags).forEach(k=>{if(!st.flagT[k])st.flagT[k]=1});
@@ -523,6 +557,13 @@ const nrevOf=id=>st.nrev[id]||{lv:0,due:addDays(st.noteT[id]||now(),NREV_DAYS[0]
 function nrevGrade(id,ok){const lv=ok?nrevOf(id).lv+1:0;
   st.nrev[id]={lv,due:lv>=NREV_DAYS.length?null:addDays(now(),NREV_DAYS[lv]),last:now()};st.nrevT[id]=now();dirty=true}
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(st))}catch(e){}}
+/* ---------- 單字卡：鍵為「w:字」或「p:片語」，vocabT 供跨裝置合併（刪除也記時間） ----------
+   卡片 {k 字或片語, t "w"|"p", m 釋義, ex 例句, src 出處題號, at 存入時間, note 筆記, rv 最近一次翻面的時間}
+   今日任務＝今天和昨天存的卡片；今天翻過面就算複習完成 */
+const vKey=(t,k)=>t+":"+k;
+function vocabSet(key,card){if(card)st.vocab[key]=card;else delete st.vocab[key];st.vocabT[key]=now();persist();Sync.schedule()}
+const vTask=()=>{const y=addDays(now(),-1);return Object.keys(st.vocab).filter(k=>(st.vocab[k].at||0)>=y)};
+const vDone=k=>(st.vocab[k].rv||0)>=dayStart(now());
 function save(){
   Object.keys(st.cur).forEach(k=>{if(prevCur[k]!==st.cur[k]){st.curT[k]=now();dirty=true}});
   prevCur={...st.cur};
@@ -565,6 +606,84 @@ function timerChip(){const T=todayAgg();return `<span class="qtimer">計時 <b i
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 // 其他選項說明：多行格式（「(A) 字 (詞性) 釋義」＋「→ 搭配與錯因」）逐行顯示，舊的一行格式照原樣
 const wHTML=w=>`<strong>其他選項　</strong>`+(w.includes("\n")?w.split("\n").map(l=>`<div class="${l.startsWith("→")?"wl wr":"wl"}">${esc(l)}</div>`).join(""):esc(w));
+/* ---------- 檢討畫面的單字／片語提示：詞典 data/glossary/toeic.json 由 tools/make_glossary.py 產生，片語比對規則兩邊相同 ---------- */
+let GL=null,glState=0,glWant=false;   // glState：0 未載入、1 載入中、2 完成、3 失敗
+function loadGloss(){if(glState)return;glState=1;
+  fetch(DATA_DIR+"glossary/toeic.json",{cache:"no-cache"}).then(r=>{if(!r.ok)throw new Error(r.status);return r.json()})
+    .then(d=>{GL=d;GL.pk=new Set(Object.keys(d.p));glState=2;if(glWant)render()}).catch(()=>{glState=3})}
+const GL_TOK=/[A-Za-zÀ-ÿ]+(?:['’-][A-Za-zÀ-ÿ]+)*|_{3,}/g,GL_WORD=/[A-Za-zÀ-ÿ]+(?:['’-][A-Za-zÀ-ÿ]+)*/g,GL_ACC=new Set(["fiancé","cafés","cybercafé"]);
+function glNorm(w){w=w.toLowerCase().replace(/’/g,"'");if(!GL_ACC.has(w))w=w.normalize("NFD").replace(/[̀-ͯ]/g,"");
+  return w.endsWith("'s")?w.slice(0,-2):w.endsWith("s'")?w.slice(0,-1):w}
+const glCand=w=>GL.f[w]?[w,GL.f[w]]:[w];
+const glHas=w=>!!(GL.w[w]||GL.w[GL.f[w]]||w.includes("-")&&w.split("-").some(x=>GL.w[x]||GL.w[GL.f[x]]));
+// 純文字 → HTML：查得到的英文字包成 .gw；詞典裡的片語（2–5 字、字與字只隔空白）整組包成 .gp，字可用原字或原形比對、取最長。
+// ans：題幹空格（_______）的正解，用來比對跨空格的片語（in _______ of → in lieu of）。詞典還沒載入時先輸出純文字，載入後重畫。
+function glossHTML(text,ans){
+  text=String(text??"");
+  if(!GL){glWant=true;loadGloss();return esc(text)}
+  const T=[];let m;GL_TOK.lastIndex=0;
+  while((m=GL_TOK.exec(text))){const s=m.index,e=s+m[0].length;
+    if(m[0][0]==="_"){const aw=String(ans||"").match(GL_WORD)||[];
+      if(!aw.length)T.push({s,e,blank:1,brk:1,c:[]});
+      else aw.forEach((x,k)=>T.push({s:k?e:s,e,blank:1,c:glCand(glNorm(x))}))}
+    else{const w=glNorm(m[0]);T.push({s,e,w,c:glCand(w)})}}
+  const joined=i=>!T[i].brk&&!T[i+1].brk&&/^[\s'’-]*$/.test(text.slice(T[i].e,T[i+1].s));
+  const grp=[];
+  for(let i=0;i<T.length;){let hit=0;
+    for(let n=Math.min(5,T.length-i);n>=2&&!hit;n--){
+      let ok=true;for(let k=i;k<i+n-1;k++)if(!joined(k)){ok=false;break}
+      if(!ok)continue;
+      let keys=[""];for(let k=i;k<i+n;k++)keys=keys.flatMap(p=>T[k].c.map(c=>p?p+" "+c:c));
+      const key=keys.find(x=>GL.pk.has(x));if(key){grp.push([i,i+n,key]);hit=n}}
+    i+=hit||1}
+  const word=(t,inP)=>{const raw=esc(text.slice(t.s,t.e));if(!raw)return "";
+    const has=!t.blank&&glHas(t.w);return has||inP?`<span class="gw"${has?` data-w="${esc(t.w)}"`:""}>${raw}</span>`:raw};
+  let out="",pos=0,gi=0;
+  for(let i=0;i<T.length;){const g=grp[gi]&&grp[gi][0]===i?grp[gi++]:null;
+    if(g){out+=esc(text.slice(pos,T[i].s))+`<span class="gp" data-p="${esc(g[2])}">`;pos=T[i].s;
+      for(let k=g[0];k<g[1];k++){out+=esc(text.slice(pos,T[k].s))+word(T[k],1);pos=Math.max(pos,T[k].e)}
+      out+="</span>";i=g[1]}
+    else{out+=esc(text.slice(pos,T[i].s))+word(T[i]);pos=Math.max(pos,T[i].e);i++}}
+  return out+esc(text.slice(pos))}
+function glWordInfo(w){if(!w)return "";const L=GL.f[w],own=GL.w[w],base=L&&GL.w[L];
+  // 變化形先列原形的釋義，變化形本身另有意思（left 左邊的、booked 已登記的）再補在後面
+  if(base)return `<b>${esc(w)}</b><span class="gt-k">　→ ${esc(L)}</span>\n${esc(base)}${own?`<span class="gt-sep"></span><span class="gt-k">${esc(w)} 本身</span>\n${esc(own)}`:""}`;
+  if(own)return `<b>${esc(w)}</b>\n${esc(own)}`;
+  const parts=w.split("-").filter(x=>GL.w[x]||GL.w[GL.f[x]]);
+  return parts.length?`<b>${esc(w)}</b>\n`+parts.map(x=>`${esc(x)}：${esc((GL.w[x]||GL.w[GL.f[x]]).split("\n")[0])}`).join("\n"):""}
+// 存單字卡用：變化形存原形（took → take），查不到原形才存原字；連字號複合字用各部分的釋義
+function glWordCard(w){if(!w)return null;const L=GL.f[w],k=L&&GL.w[L]?L:w;
+  let m=GL.w[k]||"";
+  if(!m){const parts=w.split("-").filter(x=>GL.w[x]||GL.w[GL.f[x]]);m=parts.map(x=>`${x}：${(GL.w[x]||GL.w[GL.f[x]]).split("\n")[0]}`).join("\n")}
+  return m?{k,t:"w",m}:null}
+// 例句：所在的句子（Part 7 逐句的 .sg、題幹、選項、標題，長段落再切出含該字的那一句）；題幹空格填回正解
+function glSentence(el){
+  const box=el.closest(".sg,.qtext,.opt,.p-head,.p-body,.passage");if(!box)return "";
+  let txt=box.textContent,off=0;
+  const w=document.createTreeWalker(box,NodeFilter.SHOW_TEXT);let n;while((n=w.nextNode())&&!el.contains(n))off+=n.nodeValue.length;
+  if(box.matches(".p-body,.passage")){const s=txt.lastIndexOf("\n",off),b=Math.max(s,...[". ","? ","! "].map(p=>{const i=txt.lastIndexOf(p,off);return i<0?-1:i+1}));
+    const ends=[...["\n",". ","? ","! "].map(p=>txt.indexOf(p,off)).filter(i=>i>=0).map(i=>i+1),txt.length];txt=txt.slice(b+1,Math.min(...ends))}
+  const fill=(box.closest(".qtext")||{}).dataset;
+  if(fill&&fill.fill)txt=txt.replace(/_{3,}/,fill.fill);
+  return txt.replace(/\s+/g," ").trim().slice(0,300)}
+const glSrc=()=>st.view==="prac"&&st.pr?st.pr.ids[st.pr.i]:st.view==="exam"?st.exam+"-"+(st.cur[st.exam]||0):"";
+const glTip=document.createElement("div");glTip.className="gltip";glTip.hidden=true;glTip.setAttribute("role","tooltip");document.body.appendChild(glTip);
+let glOn=[],glCur=null,glTm=0;
+function glHide(){clearTimeout(glTm);glTip.hidden=true;glOn.forEach(x=>x.classList.remove("on"));glOn=[];glCur=null}
+const glHideSoon=()=>{clearTimeout(glTm);glTm=setTimeout(glHide,280)};
+function glShow(el){if(!GL)return;glHide();
+  const gp=el.closest(".gp"),wc=glWordCard(el.dataset.w),pk=gp&&gp.dataset.p;
+  let h=gp?`<b>${esc(pk)}</b><span class="gt-k">　片語</span>\n${esc(GL.p[pk]||"")}`:"";
+  const wi=glWordInfo(el.dataset.w);if(wi)h+=(h?`<span class="gt-sep"></span>`:"")+wi;
+  if(!h)return;
+  const btn=(t,k,label)=>{const has=!!st.vocab[vKey(t,k)];return `<button type="button" data-gsave="${t}" ${has?"disabled":""}>${has?`已存 ${esc(k)}`:label}</button>`};
+  h+=`<span class="gt-acts">${pk?btn("p",pk,"＋ 存片語"):""}${wc?btn("w",wc.k,pk?`＋ 存 ${esc(wc.k)}`:"＋ 存單字"):""}</span>`;
+  glCur={el,pk,wc};
+  glOn=[el,gp].filter(Boolean);glOn.forEach(x=>x.classList.add("on"));
+  glTip.innerHTML=h;glTip.hidden=false;
+  const r=el.getBoundingClientRect(),tw=glTip.offsetWidth,th=glTip.offsetHeight;
+  let y=r.bottom+8;if(y+th>innerHeight-8)y=r.top-th-8;
+  glTip.style.left=Math.max(8,Math.min(r.left+r.width/2-tw/2,innerWidth-tw-8))+"px";glTip.style.top=Math.max(8,y)+"px"}
 // 官方公告多重正解（acc）或一律給分時，acc 內的選項都算答對
 const okAns=(q,k)=>k===q.a||(Array.isArray(q.acc)&&q.acc.includes(k));
 const keyTxt=q=>Array.isArray(q.acc)&&q.acc.length>1?(q.acc.length===4?"一律給分":q.acc.map(k=>"("+L[k]+")").join(" 或 ")):"("+L[q.a]+")";
@@ -590,10 +709,10 @@ const isOwner=()=>st.mode==="owner"&&AILock.ok;
 
 /* ---------- 跨裝置同步（GitHub Gist） ---------- */
 const SYNC_KEY="quiz-sync-v1", GIST_FILE="quiz-progress.json", GIST_DESC="刷題學習系統｜作答紀錄同步（請勿刪除）";
-function payload(){return {app:"quiz-sync",v:1,optv:1,updatedAt:now(),ans:st.ans,ansT:st.ansT,flags:st.flags,flagT:st.flagT,cur:st.cur,curT:st.curT,notes:st.notes,noteT:st.noteT,nrev:st.nrev,nrevT:st.nrevT,tlog:st.tlog||[]}}
+function payload(){return {app:"quiz-sync",v:1,optv:1,updatedAt:now(),ans:st.ans,ansT:st.ansT,flags:st.flags,flagT:st.flagT,cur:st.cur,curT:st.curT,notes:st.notes,noteT:st.noteT,nrev:st.nrev,nrevT:st.nrevT,vocab:st.vocab,vocabT:st.vocabT,tlog:st.tlog||[]}}
 function stable(o){if(o===null||typeof o!=="object")return JSON.stringify(o);if(Array.isArray(o))return "["+o.map(stable).join(",")+"]";
   return "{"+Object.keys(o).sort().map(k=>JSON.stringify(k)+":"+stable(o[k])).join(",")+"}"}
-const dataKey=o=>stable({ans:o.ans||{},ansT:o.ansT||{},flags:o.flags||{},flagT:o.flagT||{},cur:o.cur||{},curT:o.curT||{},notes:o.notes||{},noteT:o.noteT||{},nrev:o.nrev||{},nrevT:o.nrevT||{},tl:Array.isArray(o.tlog)?o.tlog.length:0,tt:Array.isArray(o.tlog)&&o.tlog.length?o.tlog[o.tlog.length-1].t:0});
+const dataKey=o=>stable({ans:o.ans||{},ansT:o.ansT||{},flags:o.flags||{},flagT:o.flagT||{},cur:o.cur||{},curT:o.curT||{},notes:o.notes||{},noteT:o.noteT||{},nrev:o.nrev||{},nrevT:o.nrevT||{},vocab:o.vocab||{},vocabT:o.vocabT||{},tl:Array.isArray(o.tlog)?o.tlog.length:0,tt:Array.isArray(o.tlog)&&o.tlog.length?o.tlog[o.tlog.length-1].t:0});
 function mergeTlog(r){if(!Array.isArray(r)||!r.length)return false;if(!Array.isArray(st.tlog))st.tlog=[];
   const seen=new Set(st.tlog.map(x=>x.t+"|"+x.id));let ch=false;
   r.forEach(x=>{if(x&&x.t&&x.id&&!seen.has(x.t+"|"+x.id)){st.tlog.push(x);seen.add(x.t+"|"+x.id);ch=true}});
@@ -619,6 +738,7 @@ function mergeRemote(r){
   ch=mergeMap(st.cur,st.curT,r.cur,r.curT)||ch;
   ch=mergeMap(st.notes,st.noteT,r.notes,r.noteT)||ch;
   ch=mergeMap(st.nrev,st.nrevT,r.nrev,r.nrevT)||ch;
+  ch=mergeMap(st.vocab,st.vocabT,r.vocab,r.vocabT)||ch;
   ch=mergeTlog(r.tlog)||ch;
   prevCur={...st.cur};
   return ch;
@@ -718,10 +838,11 @@ function renderTopbar(){
   </div>`;
 }
 /* ---------- 工具（頂列）：對外固定 TOEIC；站長沿用目前的科目，在錯題分析／抽考頁再切換 ---------- */
-const TOOLS=[["report","錯題分析"],["pset","錯題抽考"],["notes","筆記複習"],["stats","刷題統計"]];
+const TOOLS=[["vocab","單字卡"],["report","錯題分析"],["pset","錯題抽考"],["notes","筆記複習"],["stats","刷題統計"]];
 const toolOn=v=>st.view===v||(st.view==="prac"&&st.pr&&st.pr.src===(v==="notes"?"nrev":v));
-const toolAttrs=v=>`data-act="go" data-v="${v}"${isOwner()||v==="stats"||v==="notes"?"":` data-scope="toeic"`}${toolOn(v)?` aria-current="page"`:""}`;
-const toolLabel=(v,n)=>{const c=v==="notes"&&DATA_READY?dueIds().length:0;return n+(c?`<b class="tb-badge" aria-label="今天到期 ${c} 則">${c}</b>`:"")};
+const toolAttrs=v=>`data-act="go" data-v="${v}"${isOwner()||v==="stats"||v==="notes"||v==="vocab"?"":` data-scope="toeic"`}${toolOn(v)?` aria-current="page"`:""}`;
+const toolLabel=(v,n)=>{const c=!DATA_READY?0:v==="notes"?dueIds().length:v==="vocab"?vTask().filter(k=>!vDone(k)).length:0;
+  return n+(c?`<b class="tb-badge" aria-label="${v==="vocab"?"今日任務還有":"今天到期"} ${c} ${v==="vocab"?"張":"則"}">${c}</b>`:"")};
 const OWNER_SCOPES=[["toeic","TOEIC"],["stat","統計學"],["bigdata","巨量資料概論"],["ai_jr","AI 初級"],["ai_com","AI 中級．科目一"],["ai_bd","AI 中級．科目二"],["ai_ml","AI 中級．科目三"]];
 function scopeChips(){
   if(!isOwner())return "";
@@ -743,7 +864,7 @@ function renderSide(){
   const item=(v,on,icon,label)=>`<button class="side-item ${on?"on":""}" data-act="mode" data-v="${v}" title="${label}" aria-current="${on?"page":"false"}">${icon}<span class="lbl">${label}</span></button>`;
   side.innerHTML=`<div class="side-head"><button class="menubtn" data-act="side" aria-label="${exp?"收合選單":"展開選單"}" aria-controls="side" aria-expanded="${exp}">${I.menu}</button><span class="side-title lbl">選單</span></div>
     ${item("toeic",!own,I.book,"TOEIC")}${item("owner",own,AILock.ok?I.unlock:I.lock,"站長自用")}
-    <div class="side-tools">${TOOLS.map(([v,n])=>`<button class="side-item ${toolOn(v)?"on":""}" ${toolAttrs(v)}>${{report:I.file,pset:I.shuffle,notes:I.pen,stats:I.chart}[v]}<span class="lbl">${toolLabel(v,n)}</span></button>`).join("")}</div>`;
+    <div class="side-tools">${TOOLS.map(([v,n])=>`<button class="side-item ${toolOn(v)?"on":""}" ${toolAttrs(v)}>${{vocab:I.cards,report:I.file,pset:I.shuffle,notes:I.pen,stats:I.chart}[v]}<span class="lbl">${toolLabel(v,n)}</span></button>`).join("")}</div>`;
 }
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&document.body.classList.contains("side-open")){closeSide();renderSide();renderTopbar()}});
 /* ---------- 顯示主題（淺色／深色／系統，存在本機） ---------- */
@@ -769,6 +890,7 @@ const I={
   menu:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`,
   pen:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"/></svg>`,
   book:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5zM20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5z"/></svg>`,
+  cards:`<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="4" width="13" height="16" rx="2"/><path d="M4 7v11a2 2 0 0 0 2 2"/></svg>`,
   lock:`<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>`,
   unlock:`<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/></svg>`
 };
@@ -794,17 +916,18 @@ function copyText(text,cb){
   if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(cb).catch(()=>fallbackCopy(text,cb));
   else fallbackCopy(text,cb);
 }
-function passageHtml(ex,q,ansMap){
+function passageHtml(ex,q,ansMap,gloss){
   const P=(ex.passages||[])[q.p];if(!P)return "";
+  const g=t=>gloss?glossHTML(t):esc(t||"");
   if(Array.isArray(P.docs)&&P.docs.length){
-    return P.docs.map(d=>`<div class="passage"><p class="p-kind">${esc(d.kind||"")}</p>${d.head?`<p class="p-head">${esc(d.head)}</p>`:""}<div class="p-body">${esc(d.text||"")}</div></div>`).join("");
+    return P.docs.map(d=>`<div class="passage"><p class="p-kind">${esc(d.kind||"")}</p>${d.head?`<p class="p-head">${g(d.head)}</p>`:""}<div class="p-body">${g(d.text)}</div></div>`).join("");
   }
-  const body=esc(P.text).replace(/\{\{(\d+)\}\}/g,(m0,n)=>{n=+n;
+  const body=String(P.text).split(/(\{\{\d+\}\})/).map(part=>{const mm=/^\{\{(\d+)\}\}$/.exec(part);if(!mm)return g(part);const n=+mm[1];
     const qi=ex.qs.findIndex(x=>x.n===n),qq=ex.qs[qi],a=ansMap[ex.id+"-"+qi];
     if(n===q.n)return `<span class="blank cur">(${n})</span>`;
     if(qq&&a!==undefined)return `<span class="blank done">${esc(qq.o[qq.a])}</span>`;
-    return `<span class="blank">(${n})</span>`});
-  return `<div class="passage"><p class="p-kind">${esc(P.kind||"")}</p>${P.head?`<p class="p-head">${esc(P.head)}</p>`:""}<div class="p-body">${body}</div></div>`;
+    return `<span class="blank">(${n})</span>`}).join("");
+  return `<div class="passage"><p class="p-kind">${esc(P.kind||"")}</p>${P.head?`<p class="p-head">${g(P.head)}</p>`:""}<div class="p-body">${body}</div></div>`;
 }
 function passagePlain(ex,q){const P=(ex.passages||[])[q.p];if(!P)return "";
   return (P.head?P.head+"\n\n":"")+P.text.replace(/\{\{(\d+)\}\}/g,(m0,n)=>`(${n}) ______`)+"\n\n"}
@@ -993,11 +1116,11 @@ function card(id,num,ansMap,showSrc){
   </div></div>
 `;
   const isP=q.p!==undefined;
-  let qt=(isP?passageHtml(ex,q,ansMap):"")+`<p class="qtext">${esc(q.q)}</p>`;
+  let qt=(isP?passageHtml(ex,q,ansMap,done):"")+`<p class="qtext"${done?` data-fill="${esc(q.o[q.a])}"`:""}>${done?glossHTML(q.q,q.o[q.a]):esc(q.q)}</p>`;
   if(showSrc)qt+=`<p class="src">出自${qLabel(id)}</p>`;
   let op=`<div class="opts">`;
   q.o.forEach((t,k)=>{let c="opt";if(done){if(okAns(q,k))c+=" right";else if(k===a)c+=" wrong"}
-    op+=`<button class="${c}" data-act="pick" data-id="${id}" data-k="${k}" ${done?"disabled":""}><span class="bub">${L[k]}</span><span>${esc(t)}</span></button>`});
+    op+=`<button class="${c}" data-act="pick" data-id="${id}" data-k="${k}" ${done?"disabled":""}><span class="bub">${L[k]}</span><span>${done?glossHTML(t):esc(t)}</span></button>`});
   op+=`</div>`;
   h+=st.optFirst&&!done&&!isP?`${op}<div class="optfirst-q">${qt}</div>`:qt+op;
   if(!done&&q.h)h+=`<details class="hint"><summary>提示</summary><p>${esc(q.h)}</p></details>`;
@@ -1124,7 +1247,7 @@ function segPair(src,seg,key){
   for(let k=0;k<seg.length;k++){const en=seg[k][0],zh=seg[k][1],i=src.indexOf(en,pos);
     if(i<0||src.slice(pos,i).trim())return null;
     const gap=src.slice(pos,i);
-    l+=esc(gap)+`<span class="sg" data-s="${key}-${k}">${esc(en)}</span>`;
+    l+=esc(gap)+`<span class="sg" data-s="${key}-${k}">${glossHTML(en)}</span>`;
     r+="\n".repeat((gap.match(/\n/g)||[]).length)+`<span class="sg" data-s="${key}-${k}">${esc(zh)}</span>`;
     pos=i+en.length}
   return src.slice(pos).trim()?null:{l:l+esc(src.slice(pos)),r}}
@@ -1141,6 +1264,17 @@ function segHL(el,scroll){
 app.addEventListener("mouseover",e=>{const el=e.target.closest(".sg");if(el&&!el.classList.contains("on"))segHL(el,true)});
 app.addEventListener("mouseout",e=>{const el=e.target.closest(".sg");if(el&&!(e.relatedTarget&&el.contains(e.relatedTarget)))segHL(null)});
 app.addEventListener("click",e=>{const el=e.target.closest(".sg");if(el)segHL(el,true)});
+// 單字提示：滑鼠移入顯示，移出後稍等再關（讓滑鼠移得到提示框裡的「存」按鈕）；手機點字顯示，點別處或捲動就關
+app.addEventListener("mouseover",e=>{const el=e.target.closest(".gw");if(el&&!el.classList.contains("on"))glShow(el);else if(el)clearTimeout(glTm)});
+app.addEventListener("mouseout",e=>{const el=e.target.closest(".gw");if(el&&!(e.relatedTarget&&(el.contains(e.relatedTarget)||glTip.contains(e.relatedTarget))))glHideSoon()});
+glTip.addEventListener("mouseenter",()=>clearTimeout(glTm));
+glTip.addEventListener("mouseleave",e=>{if(!(e.relatedTarget&&glOn.some(x=>x.contains(e.relatedTarget))))glHideSoon()});
+glTip.addEventListener("click",e=>{const b=e.target.closest("[data-gsave]");if(!b||!glCur)return;
+  const t=b.dataset.gsave,c=t==="p"?{k:glCur.pk,t:"p",m:GL.p[glCur.pk]||""}:glCur.wc;if(!c)return;
+  vocabSet(vKey(c.t,c.k),{...c,ex:glSentence(glCur.el),src:glSrc(),at:now(),note:""});
+  b.disabled=true;b.textContent="已存 "+c.k;showToast(`已存到單字卡：${c.k}`);renderTopbar();renderSide()});
+document.addEventListener("click",e=>{if(glTip.contains(e.target))return;const el=e.target.closest&&e.target.closest(".gw");if(el)glShow(el);else glHide()},true);
+window.addEventListener("scroll",e=>{if(!glTip.contains(e.target))glHide()},true);
 function p7Sets(ex){const m=new Map();ex.qs.forEach((q,i)=>{const k=q.p||0;if(!m.has(k))m.set(k,[]);m.get(k).push(i)});return [...m.entries()].map(([p,idx])=>({p,idx}))}
 function p7Status(ex,set){const ids=set.idx.map(i=>ex.id+"-"+i);const d=ids.filter(id=>st.ans[id]!==undefined).length;
   return {done:d===ids.length,d,n:ids.length,ok:ids.filter(id=>st.ans[id]!==undefined&&okAns(QM[id].q,st.ans[id])).length}}
@@ -1153,17 +1287,18 @@ function vReading(){
   const nav=sets.map((s,k)=>{const t=p7Status(ex,s);
     return `<button class="setchip ${k===si?"cur":""} ${t.done?"done":""}" data-act="p7set" data-i="${s.idx[0]}">${qn(s.idx[0])}–${qn(s.idx[s.idx.length-1])}${t.done?`<small>${t.ok}/${t.n}</small>`:""}</button>`}).join("");
   const isP6=ex.part===6;
-  const blanks=t=>esc(t||"").replace(/\{\{(\d+)\}\}/g,(m0,n)=>{n=+n;
+  const blanks=t=>String(t||"").split(/(\{\{\d+\}\})/).map(part=>{const mm=/^\{\{(\d+)\}\}$/.exec(part);if(!mm)return review?glossHTML(part):esc(part);const n=+mm[1];
     const qi=ex.qs.findIndex(x=>x.n===n);if(qi<0)return `(${n})`;
     const id=ex.id+"-"+qi,qq=ex.qs[qi],a=st.ans[id],dv=st.p7d[id];
     if(review)return `<span class="blank done ${a===qq.a?"":"miss"}" id="blank-${n}" data-act="jumpq" data-n="${n}"><sup class="bn">${n}</sup>${esc(qq.o[qq.a])}</span>`;
-    return `<span class="blank6" id="blank-${n}" data-act="jumpq" data-n="${n}"><sup class="bn">${n}</sup>-------</span>`});
+    return `<span class="blank6" id="blank-${n}" data-act="jumpq" data-n="${n}"><sup class="bn">${n}</sup>-------</span>`}).join("");
   const dl=P.docs&&P.docs.length?P.docs:[{kind:"",head:P.head,text:P.text,seg:P.seg,hseg:P.hseg}];
   // 交卷後才有全文翻譯；每一篇都對得上原文才啟用，否則沿用舊的整段 trans
   const tr=review&&!isP6?dl.map((d,di)=>({b:segPair(d.text||"",d.seg,"t"+di),h:d.head?segPair(d.head,d.hseg,"h"+di):null})):null;
   const hasTr=!!tr&&tr.every(x=>x.b),tab=hasTr?p7Tab:"q";
   const docs=dl.map((d,di)=>{const t=hasTr?tr[di]:null;
-    return `<div class="doc">${d.head?`<p class="p-head">${t&&t.h?t.h.l:esc(d.head)}</p>`:""}<div class="p-body">${t?t.b.l:isP6?blanks(d.text):esc(d.text||"")}</div></div>`}).join("");
+    const g=x=>review?glossHTML(x):esc(x||"");
+    return `<div class="doc">${d.head?`<p class="p-head">${t&&t.h?t.h.l:g(d.head)}</p>`:""}<div class="p-body">${t?t.b.l:isP6?blanks(d.text):g(d.text)}</div></div>`}).join("");
   const DIRS={6:"Directions: Read the texts that follow. A word, phrase, or sentence is missing in parts of each text. Four answer choices for each question are given below the text. Select the best answer to complete the text. Then mark the letter (A), (B), (C), or (D) on your answer sheet.",
     7:"Directions: In this part you will read a selection of texts, such as magazine and newspaper articles, e-mails, and instant messages. Each text or set of texts is followed by several questions. Select the best answer for each question and mark the letter (A), (B), (C), or (D) on your answer sheet."};
   let h=`<div class="rhead">${backHome}<h1>${esc(ex.title)}</h1><div class="setnav">${nav}</div></div>
@@ -1178,10 +1313,10 @@ function vReading(){
     const id=ex.id+"-"+i,q=ex.qs[i],a=st.ans[id],locked=a!==undefined,sel=locked?a:st.p7d[id],fl=!!st.flags[id];
     h+=`<div class="rq" id="rq-${qn(i)}"><div class="qtop"><span class="qno">${isP6?`<button class="linkbtn qlocate" data-act="jumpblank" data-n="${qn(i)}" title="Locate blank">${qn(i)}.</button>`:`${qn(i)}.`}${review?`<span class="chip">${TAGS[q.g]?TAGS[q.g].n:""}</span>`:""}</span>
       <div class="qactions"><button class="flagbtn ${fl?"on":""}" data-act="flag" data-id="${id}" aria-pressed="${fl}">${fl?"已標註":"標註"}</button></div></div>
-      ${q.q?`<p class="qtext rq-text">${esc(q.q)}</p>`:""}<div class="opts">`;
+      ${q.q?`<p class="qtext rq-text"${review?` data-fill="${esc(q.o[q.a])}"`:""}>${review?glossHTML(q.q,q.o[q.a]):esc(q.q)}</p>`:""}<div class="opts">`;
     q.o.forEach((t,k)=>{let c="opt";
       if(review){if(okAns(q,k))c+=" right";else if(k===a)c+=" wrong"}else if(sel===k)c+=" sel";
-      h+=`<button class="${c}" data-act="p7pick" data-id="${id}" data-k="${k}" ${review||locked?"disabled":""}><span class="optl">(${L[k]})</span><span>${esc(t)}</span></button>`});
+      h+=`<button class="${c}" data-act="p7pick" data-id="${id}" data-k="${k}" ${review||locked?"disabled":""}><span class="optl">(${L[k]})</span><span>${review?glossHTML(t):esc(t)}</span></button>`});
     h+=`</div>`;
     if(review){const g=okAns(q,a);
       h+=`<div class="exp ${g?"":"isbad"}"><p class="verdict">${g?"答對":"答錯．你選 ("+L[a]+")"}，正解 ${keyTxt(q)}</p>
@@ -1389,6 +1524,50 @@ function vNotes(){
   return h;
 }
 
+/* ---------- 單字卡（存卡片在檢討畫面的單字提示框；資料見 vocabSet） ---------- */
+const vFlip=new Set(),vNoteEdit=new Set();
+// 例句裡標出這個字／片語（每個字比對字首，took、delivered 這類變化形也大多標得到）
+function vMark(ex,k){
+  const re=new RegExp("\\b"+k.split(" ").map(w=>w.slice(0,Math.max(3,w.length-2)).replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"[A-Za-z'’]*").join("\\s+"),"i"),m=re.exec(ex);
+  return m?esc(ex.slice(0,m.index))+`<mark>${esc(m[0])}</mark>`+esc(ex.slice(m.index+m[0].length)):esc(ex)}
+function vCard(k){const c=st.vocab[k];if(!c)return "";const f=vFlip.has(k),d=vDone(k),ed=vNoteEdit.has(k),src=c.src&&QM[c.src];
+  return `<div class="vcard${f?" flip":""}${d?" done":""}">
+    <button type="button" class="vc-face" data-act="vflip" data-k="${esc(k)}" aria-expanded="${f}">
+      <span class="vc-top"><span class="vc-type">${c.t==="p"?"片語":"單字"}</span>${d?`<span class="vc-ok">今天已複習</span>`:""}</span>
+      <span class="vc-word">${esc(c.k)}</span>
+      ${f?`<span class="vc-mean">${esc(c.m)}</span>${c.ex?`<span class="vc-ex">${vMark(c.ex,c.k)}</span>`:""}`:`<span class="vc-hint">點卡片看翻譯</span>`}
+    </button>
+    ${c.note&&!ed?`<div class="vc-note">${esc(c.note)}</div>`:""}
+    ${ed?`<textarea class="vnote-in" data-k="${esc(k)}" rows="3" placeholder="例句、搭配、容易混淆的字…" spellcheck="false">${esc(c.note||"")}</textarea>`:""}
+    <div class="vc-acts">${src?`<button class="linkbtn vc-src" data-act="jump" data-id="${esc(c.src)}">${esc(qLabel(c.src))}</button>`:""}
+      <span class="vc-btns"><button class="linkbtn" data-act="vcopy" data-k="${esc(k)}">複製</button><button class="linkbtn" data-act="vnote" data-k="${esc(k)}">${ed?"完成":c.note?"編輯筆記":"筆記"}</button><button class="linkbtn" data-act="vdel" data-k="${esc(k)}">刪除</button></span></div>
+  </div>`}
+function vDateLabel(t){const d=dayStart(t),t0=dayStart(now());if(d===t0)return "今天";if(d===addDays(t0,-1))return "昨天";const x=new Date(d);return (x.getMonth()+1)+"/"+x.getDate()}
+function vVocab(){
+  const all=Object.keys(st.vocab),task=vTask(),t0=dayStart(now()),byAt=(a,b)=>(st.vocab[b].at||0)-(st.vocab[a].at||0);
+  const todayK=task.filter(k=>st.vocab[k].at>=t0).sort(byAt),yestK=task.filter(k=>st.vocab[k].at<t0).sort(byAt),left=task.filter(k=>!vDone(k)).length;
+  const tab=st.vtab==="all"?"all":"task",grid=ks=>`<div class="vgrid">${ks.map(vCard).join("")}</div>`;
+  let h=`${backHome}<h1>單字卡</h1><p class="sub">題目交卷檢討時，滑鼠移到英文字上（手機點一下），按提示框裡的「存單字」或「存片語」就會加進來。今天和昨天存的卡片排進今日任務：點卡片看翻譯，翻過面就算複習完成。</p>
+  <div class="kpis"><div class="kpi"><span>今日任務</span><b>${task.length-left}／${task.length}</b></div><div class="kpi"><span>今天新存</span><b>${todayK.length}</b></div>
+    <div class="kpi"><span>昨天存的</span><b>${yestK.length}</b></div><div class="kpi"><span>全部卡片</span><b>${all.length}</b></div></div>
+  <div class="chips" role="tablist" aria-label="單字卡">${[["task","今日任務"],["all",`全部（${all.length}）`]].map(([k,n])=>`<button role="tab" aria-selected="${tab===k}" class="${tab===k?"on":""}" data-act="vtab" data-t="${k}">${n}</button>`).join("")}</div>`;
+  if(tab==="task"){
+    if(!task.length)h+=`<p style="margin-top:14px">${all.length?"今天和昨天都沒有新存的卡片。可以到「全部」翻翻以前的卡片。":"還沒有單字卡。到任一 TOEIC 題目交卷檢討，滑鼠移到英文字上就能存。"}</p>`;
+    else{
+      h+=`<p class="note" style="margin-top:10px">${left?`還有 ${left} 張沒翻過；先複習昨天的，再看今天新存的。`:"今日任務完成。"}</p>`;
+      if(yestK.length)h+=`<h2>昨天存的（${yestK.length}）</h2>`+grid(yestK);
+      if(todayK.length)h+=`<h2>今天存的（${todayK.length}）</h2>`+grid(todayK);
+    }
+  }else if(!all.length)h+=`<p style="margin-top:14px">還沒有單字卡。</p>`;
+  else{const g=new Map();all.sort(byAt).forEach(k=>{const d=dayStart(st.vocab[k].at||0);if(!g.has(d))g.set(d,[]);g.get(d).push(k)});
+    g.forEach((ks,d)=>{h+=`<h2>${vDateLabel(d)}（${ks.length}）</h2>`+grid(ks)})}
+  return h;
+}
+let vNoteTm=0;
+document.addEventListener("input",e=>{const ta=e.target;if(!ta.classList||!ta.classList.contains("vnote-in"))return;
+  const k=ta.dataset.k,c=st.vocab[k];if(!c)return;
+  st.vocab[k]={...c,note:ta.value};st.vocabT[k]=now();clearTimeout(vNoteTm);vNoteTm=setTimeout(()=>{persist();Sync.schedule()},400)});
+
 /* ---------- 同步設定 ---------- */
 function vSync(){
   const on=Sync.on(),[s,label]=syncLabel();
@@ -1420,14 +1599,14 @@ function render(){
   if(st.view==="prac"&&!(st.pr&&st.pr.ids.length&&st.pr.ids.every(id=>QM[id])))st.view="home";  // 題庫鎖定時，AI 題目的抽考先回目錄
   if(st.view==="exam"&&!ALL.some(e=>e.id===st.exam))st.view="home";
   if(!isOwner()){  // 對外只開放 TOEIC 的畫面，其餘一律回到 TOEIC 首頁
-    const toeicOnly=st.view==="home"||st.view==="stats"||st.view==="notes"||st.view==="unlock"||
+    const toeicOnly=st.view==="home"||st.view==="stats"||st.view==="notes"||st.view==="vocab"||st.view==="unlock"||
       (st.view==="exam"&&exScope(findEx(st.exam))==="toeic")||
       ((st.view==="report"||st.view==="pset")&&st.scope==="toeic")||
       (st.view==="prac"&&(st.pr.scope||"toeic")==="toeic");
     if(!toeicOnly){st.view="home";st.scope="toeic"}
   }
   const isRead=st.view==="exam"&&(findEx(st.exam).part===7||findEx(st.exam).part===6);
-  const v=isRead?vReading:({home:isOwner()?vHome:vToeic,exam:vExam,pset:vPset,prac:vPrac,report:vReport,sync:vSync,stats:vStats,notes:vNotes,unlock:vUnlock}[st.view]||vHome);
+  const v=isRead?vReading:({home:isOwner()?vHome:vToeic,exam:vExam,pset:vPset,prac:vPrac,report:vReport,sync:vSync,stats:vStats,notes:vNotes,vocab:vVocab,unlock:vUnlock}[st.view]||vHome);
   const pl=document.getElementById("paneL"),pr=document.getElementById("paneR");
   const keep=pl&&pr?{k:pl.dataset.key,l:pl.scrollTop,r:pr.scrollTop}:null;
   app.innerHTML=v();
@@ -1509,6 +1688,17 @@ document.addEventListener("click",e=>{
       st.pr={ids,ans:{},i:0,src:"nrev",scope:isOwner()?"all":"toeic",title:"筆記複習"};st.view="prac";scroll=toTop;break}
     case"nrevReset":st.nrev[d.id]={lv:0,due:dayStart(now())};st.nrevT[d.id]=now();dirty=true;break;
     case"noteDone":noteEdit.delete(d.id);persist();Sync.schedule();render();return;
+    case"vtab":st.vtab=d.t==="all"?"all":"task";break;
+    case"vflip":{const c=st.vocab[d.k];if(!c)return;
+      if(vFlip.has(d.k))vFlip.delete(d.k);else{vFlip.add(d.k);if(!vDone(d.k))vocabSet(d.k,{...c,rv:now()})}
+      render();return}
+    case"vnote":{const k=d.k;if(vNoteEdit.has(k)){vNoteEdit.delete(k);persist();Sync.schedule();render();return}
+      vNoteEdit.add(k);render();const ta=[...app.querySelectorAll(".vnote-in")].find(x=>x.dataset.k===k);
+      if(ta){ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length)}return}
+    case"vcopy":{const c=st.vocab[d.k];if(!c)return;
+      copyText([`${c.k}（${c.t==="p"?"片語":"單字"}）`,c.m,c.ex?"例句："+c.ex:"",c.src&&QM[c.src]?"出處："+qLabel(c.src):"",c.note?"筆記："+c.note:""].filter(Boolean).join("\n"),()=>showToast("已複製"));return}
+    case"vdel":{const c=st.vocab[d.k];if(!c||!confirm(`刪除單字卡「${c.k}」？`))return;
+      vocabSet(d.k,null);vFlip.delete(d.k);vNoteEdit.delete(d.k);render();return}
     case"flag":toggleFlag(d.id);break;
     case"copy":copyQuestion(d.id);return;
     case"daily":st.pr=newDaily(!!d.base);st.scope="toeic";st.view="prac";scroll=toTop;break;
