@@ -46,9 +46,10 @@ button:focus-visible,input:focus-visible,summary:focus-visible,textarea:focus-vi
 
 /* 頂列 */
 .topbar{position:sticky;top:0;z-index:50;background:var(--bg);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top,0px)}
-.topbar-in{max-width:760px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;height:56px;padding:0 16px}
+/* 頂列不跟內文一樣限 760px：工具多，寬螢幕時往兩側展開，標題才不會被擠成兩行 */
+.topbar-in{max-width:1320px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;height:56px;padding:0 16px}
 @media (min-width:768px){.topbar-in{padding:0 32px}}
-.tb-left{display:flex;align-items:center;gap:6px;min-width:0}
+.tb-left{display:flex;align-items:center;gap:6px;min-width:0;flex:none}
 .menubtn{appearance:none;border:0;background:none;width:36px;height:36px;flex:none;display:grid;place-items:center;border-radius:8px;cursor:pointer;color:var(--ink)}
 .menubtn:hover{background:var(--soft)}
 .tb-menu{margin-left:-8px}
@@ -86,10 +87,11 @@ body.side-open .scrim{opacity:1;pointer-events:auto}
   body.side-min .side .lbl{display:none}
   .tb-menu,.scrim{display:none}
 }
-.brand{appearance:none;border:0;background:none;padding:6px 0;cursor:pointer;display:inline-flex;align-items:center;gap:10px;font-weight:700;font-size:.98rem;letter-spacing:.02em}
+.brand{appearance:none;border:0;background:none;padding:6px 0;cursor:pointer;display:inline-flex;align-items:center;gap:10px;font-weight:700;font-size:.98rem;letter-spacing:.02em;white-space:nowrap}
 .syncbtn{appearance:none;border:0;background:none;padding:6px 0;cursor:pointer;display:inline-flex;align-items:center;gap:8px;font-size:.8rem;color:var(--muted);white-space:nowrap}
 .syncbtn:hover{color:var(--ink)}
-.tb-right{display:flex;align-items:center;gap:14px}
+.tb-right{display:flex;align-items:center;gap:14px;flex:none}
+@media (max-width:1100px){.tb-nav{gap:12px}}
 .themesw{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:2px}
 .themesw button{appearance:none;border:0;background:none;color:var(--muted);font-size:.74rem;padding:3px 9px;border-radius:999px;cursor:pointer;white-space:nowrap}
 .themesw button:hover{color:var(--ink)}
@@ -97,7 +99,6 @@ body.side-open .scrim{opacity:1;pointer-events:auto}
 @media (max-width:420px){.themesw button{padding:3px 7px;font-size:.7rem}.tb-right{gap:10px}.syncbtn{font-size:.74rem}}
 /* Part 7 閱讀分欄 */
 body.readmode{overflow:hidden}
-body.readmode .topbar-in{max-width:1320px}
 .wrap.readmode{max-width:1320px;padding:14px 24px 14px;height:calc(100vh - 57px);height:calc(100dvh - 57px - env(safe-area-inset-top,0px));display:flex;flex-direction:column}
 .rhead{flex:none;margin-bottom:10px}
 .rhead .back{margin-bottom:6px}
