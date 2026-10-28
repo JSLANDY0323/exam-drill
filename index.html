@@ -1616,8 +1616,50 @@ function render(){
     if(keep&&nl&&nl.dataset.key===keep.k){nl.scrollTop=keep.l;if(!p7ResetR)nr.scrollTop=keep.r}
     p7ResetR=false}
   renderTopbar();renderSide();hydrateNotes();
-  syncTimer();
+  syncTimer();navSync();
 }
+
+/* ---------- 瀏覽紀錄：換頁就 pushState，Alt+←／Alt+→、手機返回鍵在站內前後切換 ----------
+   history.state={qz:1,n:第幾頁,pg:navPage()}；最底下放一筆哨兵 {qz:1,sent:1}。
+   一頁＝畫面＋題組＋科目＋模式（換題、Part 7 換題組不算新的一頁）。
+   退到哨兵，或比最新一頁退了超過 NAV_MAX 頁，就詢問是否離開網站；不離開就回到剛剛那一頁。 */
+const NAV_MAX=20;
+let navN=-1,navTop=0,navSkip=false,navRestoring=false;
+const navPage=()=>({view:st.view,exam:st.exam,scope:st.scope,mode:st.mode==="owner"?"owner":"toeic"});
+const navKey=p=>[p.view,p.view==="exam"?p.exam:"",p.scope,p.mode].join("|");
+function navSave(){try{sessionStorage.setItem("quiz-navtop",String(navTop))}catch(e){}}
+function navInit(){
+  if("scrollRestoration" in history)history.scrollRestoration="manual";
+  const s=history.state;
+  if(s&&s.qz&&!s.sent&&typeof s.n==="number"){  // 重新整理：沿用原本的紀錄
+    navN=s.n;let t=0;try{t=+sessionStorage.getItem("quiz-navtop")||0}catch(e){}
+    navTop=Math.max(t,navN);history.replaceState({qz:1,n:navN,pg:navPage()},"")}
+  else{history.replaceState({qz:1,sent:1},"");navN=0;navTop=0;history.pushState({qz:1,n:0,pg:navPage()},"")}
+  navSave()}
+function navSync(){
+  if(navN<0||navRestoring)return;
+  const s=history.state,p=navPage();
+  if(s&&s.qz&&s.pg&&navKey(s.pg)===navKey(p)){if(!s.sent)history.replaceState({...s,pg:p},"");return}
+  navN=s&&s.qz&&!s.sent?s.n+1:navN+1;navTop=navN;navSave();
+  history.pushState({qz:1,n:navN,pg:p},"")}
+window.addEventListener("popstate",e=>{
+  if(navSkip){navSkip=false;return}
+  const s=e.state;if(!s||!s.qz||navN<0)return;
+  if(s.sent||navTop-s.n>NAV_MAX){
+    const at=s.sent?-1:s.n;  // 目前停在哪一筆（哨兵＝-1）
+    if(confirm(s.sent?"已經是第一頁了，要離開刷題網站嗎？":`已經往回 ${NAV_MAX} 頁了，要離開刷題網站嗎？`)){
+      history.go(-(at+2));
+      setTimeout(()=>{if(document.visibilityState==="visible"){navSkip=true;history.forward()}},600);  // 沒有上一個網站可回時留在原頁
+    }else{navSkip=true;history.forward()}
+    return}
+  navN=s.n;const p=s.pg||{};
+  st.view=VIEWS.includes(p.view)||p.view==="unlock"?p.view:"home";
+  if(p.exam&&ALL.some(x=>x.id===p.exam))st.exam=p.exam;
+  if(p.scope)st.scope=p.scope;
+  st.mode=p.mode==="owner"&&AILock.ok?"owner":"toeic";
+  closeSide();navRestoring=true;save();render();navRestoring=false;
+  history.replaceState({qz:1,n:navN,pg:navPage()},"");  // render 可能把畫面導回首頁，以實際畫面為準
+  window.scrollTo(0,0)});
 
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function toTop(){window.scrollTo(0,0)}
@@ -1814,7 +1856,7 @@ app.innerHTML='<p class="note" style="padding:40px 0;text-align:center">題庫�
 renderTopbar();renderSide();
 loadData().then(()=>{
   DATA_READY=true;
-  load();prevCur={...st.cur};
+  load();prevCur={...st.cur};navInit();
   render();
   if(Sync.on())Sync.run();
 }).catch(err=>{
