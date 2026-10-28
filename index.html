@@ -247,6 +247,8 @@ h2{font-size:1rem;margin:36px 0 12px;font-weight:700}
 .qexp-text{margin:0 0 10px;line-height:1.75}
 .qopt-breakdown{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:.9rem;line-height:1.7;color:var(--muted)}
 .qopt-breakdown strong,.qtrans strong{color:var(--ink)}
+.qopt-breakdown .wl{margin-top:2px}.qopt-breakdown .wl:not(.wr){margin-top:8px;color:var(--ink)}.qopt-breakdown .wr{padding-left:1.4em;text-indent:-1.4em}
+.qopt-breakdown strong+.wl{margin-top:4px}
 /* 檢討筆記 */
 .notebox{margin-top:16px;padding-top:12px;border-top:1px dashed var(--line)}
 .note-head{display:flex;align-items:baseline;gap:10px;margin-bottom:8px}
@@ -561,6 +563,8 @@ function tlogCat(r){const it=QM[r.id];if(!it)return "其他";const ex=it.ex,sc=e
   return {stat:"統計學",bigdata:"巨量資料概論",ai_jr:"AI應用規劃師（初級）",ai_sr:"AI應用規劃師（中級）"}[sc]||"其他"}
 function timerChip(){const T=todayAgg();return `<span class="qtimer">計時 <b id="qtimer">0:00</b>${T.tn?`．今日平均 ${fmtDur(T.avg)}／題`:""}</span>`}
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+// 其他選項說明：多行格式（「(A) 字 (詞性) 釋義」＋「→ 搭配與錯因」）逐行顯示，舊的一行格式照原樣
+const wHTML=w=>`<strong>其他選項　</strong>`+(w.includes("\n")?w.split("\n").map(l=>`<div class="${l.startsWith("→")?"wl wr":"wl"}">${esc(l)}</div>`).join(""):esc(w));
 // 官方公告多重正解（acc）或一律給分時，acc 內的選項都算答對
 const okAns=(q,k)=>k===q.a||(Array.isArray(q.acc)&&q.acc.includes(k));
 const keyTxt=q=>Array.isArray(q.acc)&&q.acc.length>1?(q.acc.length===4?"一律給分":q.acc.map(k=>"("+L[k]+")").join(" 或 ")):"("+L[q.a]+")";
@@ -812,7 +816,7 @@ function copyQuestion(id){
   text+=`\n【正解】${keyTxt(q)}\n`;
   if(q.trans)text+=`【中文翻譯】${q.trans}\n`;
   if(q.e)text+=`【考點詳解】${q.e}\n`;
-  if(q.w)text+=`【其他選項解析】${q.w}\n`;
+  if(q.w)text+=`【其他選項解析】${q.w.includes("\n")?"\n":""}${q.w}\n`;
   if(st.notes[id])text+=`【我的筆記】\n${st.notes[id]}\n`;
   copyText(text,()=>{
     showToast("已複製題目與解析");
@@ -1003,7 +1007,7 @@ function card(id,num,ansMap,showSrc){
     <p class="verdict">${g?"答對":"答錯．你選 ("+L[a]+")"}，正解 ${keyTxt(q)}${lt&&lt.ms!=null?`<span class="vtime">．用時 ${fmtDur(lt.ms)}</span>`:""}</p>
     ${q.trans?`<div class="qtrans"><strong>中文翻譯　</strong>${esc(q.trans)}</div>`:""}
     ${q.e?`<p class="qexp-text"><strong>${ex.unofficial?"參考解析":"詳解"}　</strong>${esc(q.e)}</p>`:`<p class="note">此題目前僅收錄${ex.kind==="past"?"官方公布答案":"答案"}。</p>`}
-    ${q.w?`<div class="qopt-breakdown"><strong>其他選項　</strong>${esc(q.w)}</div>`:""}
+    ${q.w?`<div class="qopt-breakdown">${wHTML(q.w)}</div>`:""}
     ${ex.unofficial?`<p class="note">本年度為參考解答，非官方公布答案。</p>`:""}
     ${isP&&ex.passages[q.p].trans?`<details class="ptrans"><summary>全文翻譯</summary><p>${esc(ex.passages[q.p].trans)}</p></details>`:""}
     ${noteBox(id)}
@@ -1183,7 +1187,7 @@ function vReading(){
       h+=`<div class="exp ${g?"":"isbad"}"><p class="verdict">${g?"答對":"答錯．你選 ("+L[a]+")"}，正解 ${keyTxt(q)}</p>
         ${q.trans?`<div class="qtrans"><strong>${isP6?"句子翻譯":"題目翻譯"}　</strong>${esc(q.trans)}</div>`:""}
         ${q.e?`<p class="qexp-text"><strong>詳解　</strong>${esc(q.e)}</p>`:""}
-        ${q.w?`<div class="qopt-breakdown"><strong>其他選項　</strong>${esc(q.w)}</div>`:""}${noteBox(id)}</div>`}
+        ${q.w?`<div class="qopt-breakdown">${wHTML(q.w)}</div>`:""}${noteBox(id)}</div>`}
     h+=`</div>`});
   const filled=set.idx.filter(i=>{const id=ex.id+"-"+i;return st.ans[id]!==undefined||st.p7d[id]!==undefined}).length;
   if(!review)h+=`<div class="submitbar"><span class="note">${timerChip()}<br>已選 ${filled}／${set.idx.length} 題${filled<set.idx.length?"．全部選完才能交卷":""}</span><button class="btn primary" data-act="p7submit" ${filled<set.idx.length?"disabled":""}>交卷並檢討</button></div>`;
