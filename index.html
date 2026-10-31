@@ -148,6 +148,7 @@ body.readmode{overflow:hidden}
 .sg.on{background:var(--hl);box-shadow:0 0 0 2px var(--hl)}
 /* 檢討畫面的單字／片語提示（glossHTML）：片語加細虛線，滑到的字與所在片語上色 */
 .gw{cursor:help;border-radius:2px}
+.gl-fill{border-bottom:1px dotted var(--ink)}
 .gp{border-bottom:1px dotted var(--faint);-webkit-box-decoration-break:clone;box-decoration-break:clone}
 .gw.on,.gp.on{background:var(--gl)}
 .gp.on{border-bottom-color:var(--ink)}
@@ -618,16 +619,16 @@ function glNorm(w){w=w.toLowerCase().replace(/’/g,"'");if(!GL_ACC.has(w))w=w.n
 const glCand=w=>GL.f[w]?[w,GL.f[w]]:[w];
 const glHas=w=>!!(GL.w[w]||GL.w[GL.f[w]]||w.includes("-")&&w.split("-").some(x=>GL.w[x]||GL.w[GL.f[x]]));
 // 純文字 → HTML：查得到的英文字包成 .gw；詞典裡的片語（2–5 字、字與字只隔空白）整組包成 .gp，字可用原字或原形比對、取最長。
-// ans：題幹空格（_______）的正解，用來比對跨空格的片語（in _______ of → in lieu of）。詞典還沒載入時先輸出純文字，載入後重畫。
+// ans：檢討時將題幹空格填回正解，連同前後文比對片語；填入的字加底線，亦可查字及存卡。詞典尚未載入時先顯示純文字。
 function glossHTML(text,ans){
   text=String(text??"");
+  const fills=[];let shift=0;
+  if(ans)text=text.replace(/_{3,}/g,(blank,offset)=>{const s=offset+shift,a=String(ans);fills.push([s,s+a.length]);shift+=a.length-blank.length;return a});
   if(!GL){glWant=true;loadGloss();return esc(text)}
   const T=[];let m;GL_TOK.lastIndex=0;
   while((m=GL_TOK.exec(text))){const s=m.index,e=s+m[0].length;
-    if(m[0][0]==="_"){const aw=String(ans||"").match(GL_WORD)||[];
-      if(!aw.length)T.push({s,e,blank:1,brk:1,c:[]});
-      else aw.forEach((x,k)=>T.push({s:k?e:s,e,blank:1,c:glCand(glNorm(x))}))}
-    else{const w=glNorm(m[0]);T.push({s,e,w,c:glCand(w)})}}
+    if(m[0][0]==="_")T.push({s,e,blank:1,brk:1,c:[]});
+    else{const w=glNorm(m[0]);T.push({s,e,w,fill:fills.some(([a,b])=>s>=a&&e<=b),c:glCand(w)})}}
   const joined=i=>!T[i].brk&&!T[i+1].brk&&/^[\s'’-]*$/.test(text.slice(T[i].e,T[i+1].s));
   const grp=[];
   for(let i=0;i<T.length;){let hit=0;
@@ -638,7 +639,8 @@ function glossHTML(text,ans){
       const key=keys.find(x=>GL.pk.has(x));if(key){grp.push([i,i+n,key]);hit=n}}
     i+=hit||1}
   const word=(t,inP)=>{const raw=esc(text.slice(t.s,t.e));if(!raw)return "";
-    const has=!t.blank&&glHas(t.w);return has||inP?`<span class="gw"${has?` data-w="${esc(t.w)}"`:""}>${raw}</span>`:raw};
+    const has=!t.blank&&glHas(t.w),cls=[has||inP?"gw":"",t.fill?"gl-fill":""].filter(Boolean).join(" ");
+    return cls?`<span class="${cls}"${has?` data-w="${esc(t.w)}"`:""}>${raw}</span>`:raw};
   let out="",pos=0,gi=0;
   for(let i=0;i<T.length;){const g=grp[gi]&&grp[gi][0]===i?grp[gi++]:null;
     if(g){out+=esc(text.slice(pos,T[i].s))+`<span class="gp" data-p="${esc(g[2])}">`;pos=T[i].s;
@@ -660,14 +662,16 @@ function glWordCard(w){if(!w)return null;const L=GL.f[w],k=L&&GL.w[L]?L:w;
 // 例句：所在的句子（Part 7 逐句的 .sg、題幹、選項、標題，長段落再切出含該字的那一句）；題幹空格填回正解
 function glSentence(el){
   const box=el.closest(".sg,.qtext,.opt,.p-head,.p-body,.passage");if(!box)return "";
-  let txt=box.textContent,off=0;
-  const w=document.createTreeWalker(box,NodeFilter.SHOW_TEXT);let n;while((n=w.nextNode())&&!el.contains(n))off+=n.nodeValue.length;
+  let txt="",off=0,found=false;
+  const w=document.createTreeWalker(box,NodeFilter.SHOW_TEXT);let n;
+  while((n=w.nextNode())){if(n.parentElement.closest(".bn,.optl,.bub"))continue;
+    if(!found&&el.contains(n)){off=txt.length;found=true}txt+=n.nodeValue}
   if(box.matches(".p-body,.passage")){const s=txt.lastIndexOf("\n",off),b=Math.max(s,...[". ","? ","! "].map(p=>{const i=txt.lastIndexOf(p,off);return i<0?-1:i+1}));
     const ends=[...["\n",". ","? ","! "].map(p=>txt.indexOf(p,off)).filter(i=>i>=0).map(i=>i+1),txt.length];txt=txt.slice(b+1,Math.min(...ends))}
   const fill=(box.closest(".qtext")||{}).dataset;
   if(fill&&fill.fill)txt=txt.replace(/_{3,}/,fill.fill);
   return txt.replace(/\s+/g," ").trim().slice(0,300)}
-const glSrc=()=>st.view==="prac"&&st.pr?st.pr.ids[st.pr.i]:st.view==="exam"?st.exam+"-"+(st.cur[st.exam]||0):"";
+const glSrc=el=>el?.closest("[data-qid]")?.dataset.qid||(st.view==="prac"&&st.pr?st.pr.ids[st.pr.i]:st.view==="exam"?st.exam+"-"+(st.cur[st.exam]||0):"");
 const glTip=document.createElement("div");glTip.className="gltip";glTip.hidden=true;glTip.setAttribute("role","tooltip");document.body.appendChild(glTip);
 let glOn=[],glCur=null,glTm=0;
 function glHide(){clearTimeout(glTm);glTip.hidden=true;glOn.forEach(x=>x.classList.remove("on"));glOn=[];glCur=null}
@@ -925,6 +929,7 @@ function passageHtml(ex,q,ansMap,gloss){
   }
   const body=String(P.text).split(/(\{\{\d+\}\})/).map(part=>{const mm=/^\{\{(\d+)\}\}$/.exec(part);if(!mm)return g(part);const n=+mm[1];
     const qi=ex.qs.findIndex(x=>x.n===n),qq=ex.qs[qi],a=ansMap[ex.id+"-"+qi];
+    if(gloss&&qq&&(n===q.n||a!==undefined))return `<span class="blank done" data-qid="${esc(ex.id+"-"+qi)}">${glossHTML(qq.o[qq.a])}</span>`;
     if(n===q.n)return `<span class="blank cur">(${n})</span>`;
     if(qq&&a!==undefined)return `<span class="blank done">${esc(qq.o[qq.a])}</span>`;
     return `<span class="blank">(${n})</span>`}).join("");
@@ -1109,7 +1114,7 @@ document.addEventListener("keydown",e=>{
 
 function card(id,num,ansMap,showSrc){
   const {ex,q}=QM[id],a=ansMap[id],done=a!==undefined,fl=!!st.flags[id];
-  let h=`<div class="panel"><div class="qtop">
+  let h=`<div class="panel" data-qid="${esc(id)}"><div class="qtop">
   <span class="qno">第 ${num} 題<span class="chip">${TAGS[q.g]?TAGS[q.g].n:""}</span></span>${done?"":timerChip()}
   <div class="qactions">
     <button class="copybtn" data-act="copy" data-id="${id}" title="複製此題、選項與解析">複製</button>
@@ -1272,7 +1277,7 @@ glTip.addEventListener("mouseenter",()=>clearTimeout(glTm));
 glTip.addEventListener("mouseleave",e=>{if(!(e.relatedTarget&&glOn.some(x=>x.contains(e.relatedTarget))))glHideSoon()});
 glTip.addEventListener("click",e=>{const b=e.target.closest("[data-gsave]");if(!b||!glCur)return;
   const t=b.dataset.gsave,c=t==="p"?{k:glCur.pk,t:"p",m:GL.p[glCur.pk]||""}:glCur.wc;if(!c)return;
-  vocabSet(vKey(c.t,c.k),{...c,ex:glSentence(glCur.el),src:glSrc(),at:now(),note:""});
+  vocabSet(vKey(c.t,c.k),{...c,ex:glSentence(glCur.el),src:glSrc(glCur.el),at:now(),note:""});
   b.disabled=true;b.textContent="已存 "+c.k;showToast(`已存到單字卡：${c.k}`);renderTopbar();renderSide()});
 document.addEventListener("click",e=>{if(glTip.contains(e.target))return;const el=e.target.closest&&e.target.closest(".gw");if(el)glShow(el);else glHide()},true);
 window.addEventListener("scroll",e=>{if(!glTip.contains(e.target))glHide()},true);
@@ -1291,7 +1296,7 @@ function vReading(){
   const blanks=t=>String(t||"").split(/(\{\{\d+\}\})/).map(part=>{const mm=/^\{\{(\d+)\}\}$/.exec(part);if(!mm)return review?glossHTML(part):esc(part);const n=+mm[1];
     const qi=ex.qs.findIndex(x=>x.n===n);if(qi<0)return `(${n})`;
     const id=ex.id+"-"+qi,qq=ex.qs[qi],a=st.ans[id],dv=st.p7d[id];
-    if(review)return `<span class="blank done ${a===qq.a?"":"miss"}" id="blank-${n}" data-act="jumpq" data-n="${n}"><sup class="bn">${n}</sup>${esc(qq.o[qq.a])}</span>`;
+    if(review)return `<span class="blank done ${a===qq.a?"":"miss"}" id="blank-${n}" data-qid="${esc(id)}" data-act="jumpq" data-n="${n}"><sup class="bn">${n}</sup>${glossHTML(qq.o[qq.a])}</span>`;
     return `<span class="blank6" id="blank-${n}" data-act="jumpq" data-n="${n}"><sup class="bn">${n}</sup>-------</span>`}).join("");
   const dl=P.docs&&P.docs.length?P.docs:[{kind:"",head:P.head,text:P.text,seg:P.seg,hseg:P.hseg}];
   // 交卷後才有全文翻譯；每一篇都對得上原文才啟用，否則沿用舊的整段 trans
@@ -1312,7 +1317,7 @@ function vReading(){
     dl.map((d,di)=>`<div class="doc trdoc">${d.kind?`<p class="p-kind">${esc(d.kind)}</p>`:""}${d.head?`<p class="p-head">${tr[di].h?tr[di].h.r:esc(d.head)}</p>`:""}<div class="p-body">${tr[di].b.r}</div></div>`).join("");
   else set.idx.forEach(i=>{
     const id=ex.id+"-"+i,q=ex.qs[i],a=st.ans[id],locked=a!==undefined,sel=locked?a:st.p7d[id],fl=!!st.flags[id];
-    h+=`<div class="rq" id="rq-${qn(i)}"><div class="qtop"><span class="qno">${isP6?`<button class="linkbtn qlocate" data-act="jumpblank" data-n="${qn(i)}" title="Locate blank">${qn(i)}.</button>`:`${qn(i)}.`}${review?`<span class="chip">${TAGS[q.g]?TAGS[q.g].n:""}</span>`:""}</span>
+    h+=`<div class="rq" id="rq-${qn(i)}" data-qid="${esc(id)}"><div class="qtop"><span class="qno">${isP6?`<button class="linkbtn qlocate" data-act="jumpblank" data-n="${qn(i)}" title="Locate blank">${qn(i)}.</button>`:`${qn(i)}.`}${review?`<span class="chip">${TAGS[q.g]?TAGS[q.g].n:""}</span>`:""}</span>
       <div class="qactions"><button class="flagbtn ${fl?"on":""}" data-act="flag" data-id="${id}" aria-pressed="${fl}">${fl?"已標註":"標註"}</button></div></div>
       ${q.q?`<p class="qtext rq-text"${review?` data-fill="${esc(q.o[q.a])}"`:""}>${review?glossHTML(q.q,q.o[q.a]):esc(q.q)}</p>`:""}<div class="opts">`;
     q.o.forEach((t,k)=>{let c="opt";
@@ -1779,7 +1784,7 @@ document.addEventListener("click",e=>{
     case"jumpblank":{const el=document.getElementById("blank-"+d.n),pl=document.getElementById("paneL");
       if(el&&pl){pl.scrollTop+=el.getBoundingClientRect().top-pl.getBoundingClientRect().top-pl.clientHeight/3;el.classList.add("flash");setTimeout(()=>el.classList.remove("flash"),1200)}return}
     case"p7tab":p7Tab=d.t==="tr"?"tr":"q";p7ResetR=true;render();return;
-    case"jumpq":{const el=document.getElementById("rq-"+d.n),pr=document.getElementById("paneR");
+    case"jumpq":{if(e.target.closest(".gw"))return;const el=document.getElementById("rq-"+d.n),pr=document.getElementById("paneR");
       if(el&&pr){pr.scrollTop+=el.getBoundingClientRect().top-pr.getBoundingClientRect().top-8}return}
     case"p7pick":if(!st.p7d||typeof st.p7d!=="object")st.p7d={};st.p7d[d.id]=+d.k;persist();render();return;
     case"p7set":{if(+d.i<0)return;st.cur[st.exam]=+d.i;save();render();window.scrollTo(0,0);
