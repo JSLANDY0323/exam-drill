@@ -612,7 +612,7 @@ const wHTML=w=>`<strong>其他選項　</strong>`+(w.includes("\n")?w.split("\n"
 let GL=null,glState=0,glWant=false;   // glState：0 未載入、1 載入中、2 完成、3 失敗
 function loadGloss(){if(glState)return;glState=1;
   fetch(DATA_DIR+"glossary/toeic.json",{cache:"no-cache"}).then(r=>{if(!r.ok)throw new Error(r.status);return r.json()})
-    .then(d=>{GL=d;GL.pk=new Set(Object.keys(d.p));glState=2;if(glWant)render()}).catch(()=>{glState=3})}
+    .then(d=>{GL=d;GL.pk=new Set(Object.keys(d.p));GL.ks=new Set(d.k||[]);glState=2;if(glWant)render()}).catch(()=>{glState=3})}
 const GL_TOK=/[A-Za-zÀ-ÿ]+(?:['’-][A-Za-zÀ-ÿ]+)*|_{3,}/g,GL_WORD=/[A-Za-zÀ-ÿ]+(?:['’-][A-Za-zÀ-ÿ]+)*/g,GL_ACC=new Set(["fiancé","cafés","cybercafé"]);
 function glNorm(w){w=w.toLowerCase().replace(/’/g,"'");if(!GL_ACC.has(w))w=w.normalize("NFD").replace(/[̀-ͯ]/g,"");
   return w.endsWith("'s")?w.slice(0,-2):w.endsWith("s'")?w.slice(0,-1):w}
@@ -649,13 +649,15 @@ function glossHTML(text,ans){
     else{out+=esc(text.slice(pos,T[i].s))+word(T[i]);pos=Math.max(pos,T[i].e);i++}}
   return out+esc(text.slice(pos))}
 function glWordInfo(w){if(!w)return "";const L=GL.f[w],own=GL.w[w],base=L&&GL.w[L];
-  // 變化形先列原形的釋義，變化形本身另有意思（left 左邊的、booked 已登記的）再補在後面
+  // 題目當形容詞／名詞用的變化形（GL.k：challenging、bound）先列本身的意思，原形接在後面
+  if(own&&base&&GL.ks.has(w))return `<b>${esc(w)}</b>\n${esc(own)}<span class="gt-sep"></span><span class="gt-k">原形 ${esc(L)}</span>\n${esc(base)}`;
+  // 其他變化形先列原形的釋義，變化形本身另有意思（left 左邊的、booked 已登記的）再補在後面
   if(base)return `<b>${esc(w)}</b><span class="gt-k">　→ ${esc(L)}</span>\n${esc(base)}${own?`<span class="gt-sep"></span><span class="gt-k">${esc(w)} 本身</span>\n${esc(own)}`:""}`;
   if(own)return `<b>${esc(w)}</b>\n${esc(own)}`;
   const parts=w.split("-").filter(x=>GL.w[x]||GL.w[GL.f[x]]);
   return parts.length?`<b>${esc(w)}</b>\n`+parts.map(x=>`${esc(x)}：${esc((GL.w[x]||GL.w[GL.f[x]]).split("\n")[0])}`).join("\n"):""}
-// 存單字卡用：變化形存原形（took → take），查不到原形才存原字；連字號複合字用各部分的釋義
-function glWordCard(w){if(!w)return null;const L=GL.f[w],k=L&&GL.w[L]?L:w;
+// 存單字卡用：變化形存原形（took → take），GL.k 裡的（challenging）和查不到原形的存原字；連字號複合字用各部分的釋義
+function glWordCard(w){if(!w)return null;const L=GL.f[w],k=L&&GL.w[L]&&!GL.ks.has(w)?L:w;
   let m=GL.w[k]||"";
   if(!m){const parts=w.split("-").filter(x=>GL.w[x]||GL.w[GL.f[x]]);m=parts.map(x=>`${x}：${(GL.w[x]||GL.w[GL.f[x]]).split("\n")[0]}`).join("\n")}
   return m?{k,t:"w",m}:null}
@@ -1541,7 +1543,7 @@ function vCard(k){const c=st.vocab[k];if(!c)return "";const f=vFlip.has(k),d=vDo
     <button type="button" class="vc-face" data-act="vflip" data-k="${esc(k)}" aria-expanded="${f}">
       <span class="vc-top"><span class="vc-type">${c.t==="p"?"片語":"單字"}</span>${d?`<span class="vc-ok">今天已複習</span>`:""}</span>
       <span class="vc-word">${esc(c.k)}</span>
-      ${f?`<span class="vc-mean">${esc(c.m)}</span>${c.ex?`<span class="vc-ex">${vMark(c.ex,c.k)}</span>`:""}`:`<span class="vc-hint">點卡片看翻譯</span>`}
+      ${f?`<span class="vc-mean">${esc(vMean(c))}</span>${c.ex?`<span class="vc-ex">${vMark(c.ex,c.k)}</span>`:""}`:`<span class="vc-hint">點卡片看翻譯</span>`}
     </button>
     ${c.note&&!ed?`<div class="vc-note">${esc(c.note)}</div>`:""}
     ${ed?`<textarea class="vnote-in" data-k="${esc(k)}" rows="3" placeholder="例句、搭配、容易混淆的字…" spellcheck="false">${esc(c.note||"")}</textarea>`:""}
@@ -1549,7 +1551,10 @@ function vCard(k){const c=st.vocab[k];if(!c)return "";const f=vFlip.has(k),d=vDo
       <span class="vc-btns"><button class="linkbtn" data-act="vcopy" data-k="${esc(k)}">複製</button><button class="linkbtn" data-act="vnote" data-k="${esc(k)}">${ed?"完成":c.note?"編輯筆記":"筆記"}</button><button class="linkbtn" data-act="vdel" data-k="${esc(k)}">刪除</button></span></div>
   </div>`}
 function vDateLabel(t){const d=dayStart(t),t0=dayStart(now());if(d===t0)return "今天";if(d===addDays(t0,-1))return "昨天";const x=new Date(d);return (x.getMonth()+1)+"/"+x.getDate()}
+// 卡片釋義以目前的詞典為準（詞典更新後舊卡片也跟著更新），詞典還沒載入或查不到時用存卡時的釋義
+const vMean=c=>GL&&(c.t==="p"?GL.p[c.k]:GL.w[c.k])||c.m;
 function vVocab(){
+  if(!GL&&Object.keys(st.vocab).length){glWant=true;loadGloss()}
   const all=Object.keys(st.vocab),task=vTask(),t0=dayStart(now()),byAt=(a,b)=>(st.vocab[b].at||0)-(st.vocab[a].at||0);
   const todayK=task.filter(k=>st.vocab[k].at>=t0).sort(byAt),yestK=task.filter(k=>st.vocab[k].at<t0).sort(byAt),left=task.filter(k=>!vDone(k)).length;
   const tab=st.vtab==="all"?"all":"task",grid=ks=>`<div class="vgrid">${ks.map(vCard).join("")}</div>`;
@@ -1744,7 +1749,7 @@ document.addEventListener("click",e=>{
       vNoteEdit.add(k);render();const ta=[...app.querySelectorAll(".vnote-in")].find(x=>x.dataset.k===k);
       if(ta){ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length)}return}
     case"vcopy":{const c=st.vocab[d.k];if(!c)return;
-      copyText([`${c.k}（${c.t==="p"?"片語":"單字"}）`,c.m,c.ex?"例句："+c.ex:"",c.src&&QM[c.src]?"出處："+qLabel(c.src):"",c.note?"筆記："+c.note:""].filter(Boolean).join("\n"),()=>showToast("已複製"));return}
+      copyText([`${c.k}（${c.t==="p"?"片語":"單字"}）`,vMean(c),c.ex?"例句："+c.ex:"",c.src&&QM[c.src]?"出處："+qLabel(c.src):"",c.note?"筆記："+c.note:""].filter(Boolean).join("\n"),()=>showToast("已複製"));return}
     case"vdel":{const c=st.vocab[d.k];if(!c||!confirm(`刪除單字卡「${c.k}」？`))return;
       vocabSet(d.k,null);vFlip.delete(d.k);vNoteEdit.delete(d.k);render();return}
     case"flag":toggleFlag(d.id);break;
