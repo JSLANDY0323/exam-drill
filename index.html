@@ -450,6 +450,27 @@ code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85em;backgroun
 .l-clipbtn.ghost{background:var(--bg);color:var(--ink)}
 .l-clipbtn:hover{opacity:.88}
 .l-next{display:flex;justify-content:flex-end;margin-top:12px}
+/* Part 3／4 題組檢討：左欄播放器＋原文（電腦版固定在畫面上），右欄題目與詳解 */
+.wrap.lwide{max-width:1180px}
+.l-rev{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+.l-rev-l{position:sticky;top:64px;max-height:calc(100vh - 80px);max-height:calc(100dvh - 80px);overflow-y:auto;overscroll-behavior:contain;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:0 14px 14px}
+.l-rev-r>.panel:first-child{margin-top:0}
+.l-player{position:sticky;top:0;z-index:2;margin:0 -14px 12px;padding:12px 14px;background:var(--soft);border-bottom:1px solid var(--line);display:grid;gap:8px}
+.l-prow{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.l-pbtn{appearance:none;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;min-height:38px;padding:6px 12px;font-size:.85rem;cursor:pointer;font-variant-numeric:tabular-nums}
+.l-pbtn.sm{min-height:0;padding:3px 10px;font-size:.78rem;color:var(--muted)}
+.l-pbtn:hover{border-color:var(--ink)}
+.l-tt{margin-left:auto;font-size:.82rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.l-tl{width:100%;margin:0;accent-color:var(--ink);cursor:pointer}
+.l-script2{font-size:.93rem;line-height:1.7}
+.l-scr-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin:0 0 10px;font-size:.8rem;color:var(--muted)}
+.l-ln{margin:0 0 10px}
+.l-ln .l-tr{display:block;color:var(--muted);font-size:.86rem;margin-top:2px}
+body.l-notr .l-ln .l-tr{display:none}
+.l-script2 .l-voc{border-top:1px solid var(--line);padding-top:8px;font-size:.85rem;color:var(--muted)}
+.l-rev-l .l-graphic{background:var(--bg)}
+.l-pnav{display:flex;justify-content:space-between;gap:10px;margin:16px 0}
+@media (max-width:900px){.l-rev{grid-template-columns:1fr;gap:12px}.l-rev-l{position:static;max-height:none;overflow:visible}.l-player{position:static}}
 @media (max-width:560px){.kpis{grid-template-columns:repeat(2,1fr)}.stbl{font-size:.84rem}.stbl th,.stbl td{padding:8px 4px}}
 @media (prefers-reduced-motion:no-preference){.exp{animation:in .2s ease-out}@keyframes in{from{opacity:0}}}
 </style>
@@ -1409,6 +1430,10 @@ let lPartTab=1,lAccAlt=false,lRate=1,lLastEx="";
    片段用一個不放在畫面裡的 Audio 播放，重繪畫面不會中斷；播到結束秒數自動暫停。 */
 let lClipMode=(()=>{try{return localStorage.getItem("quiz-lclip")!=="0"}catch(e){return true}})();
 const LClip={au:null,id:"",mkey:"",start:0,end:0,state:"",timer:0,first:{}};
+let lSetPage={},lWide=false,lHideTr=(()=>{try{return localStorage.getItem("quiz-lhidetr")==="1"}catch(e){return false}})();
+// 逐題播放時 Part 3／4（畫面上全是題組）一個題組一頁；lSetPage 記每份試卷（模擬考再分 Part）目前在哪個題組
+const lPageKey=ex=>ex.id+"|"+(ex.mock==="listening"?lPartTab:0);
+function lPaged(ex){const vis=lVisIdx(ex);return lClipOn(ex)&&vis.length>0&&vis.every(i=>ex.qs[i].s!==undefined)}
 const lHasClips=ex=>!!ex&&(ex.qs.some(q=>q.t)||(ex.sets||[]).some(s=>s.t));
 const lClipOn=ex=>lClipMode&&lHasClips(ex);
 function lClipSrc(ex,q){  // {id 片段代表題（題組第一題）, mkey, raw, r:[開始,結束]}；沒有時戳回傳 null
@@ -1433,25 +1458,64 @@ function lClipAudio(){
   a.addEventListener("play",()=>{LClip.state="play";clearInterval(LClip.timer);LClip.timer=setInterval(lClipTick,50);lClipUi()});
   a.addEventListener("pause",()=>{clearInterval(LClip.timer);if(LClip.state==="play")LClip.state="pause";lClipUi()});
   a.addEventListener("ended",()=>{LClip.state="done";lClipUi()});
+  a.addEventListener("seeked",lClipTl);
   return a;
 }
-function lClipTick(){const a=LClip.au;if(a&&a.currentTime>=LClip.end){LClip.state="done";a.pause()}}
-function lClipStop(){if(LClip.au&&!LClip.au.paused){LClip.state="";LClip.au.pause()}LClip.id=""}
+function lClipTick(){const a=LClip.au;if(a&&a.currentTime>=LClip.end){LClip.state="done";a.pause()}lClipTl()}
+function lClipStop(){if(LClip.au&&!LClip.au.paused){LClip.state="";LClip.au.pause()}LClip.id="";lClipTl()}
+// 把片段的音檔載入 LClip.au、停在片段開頭（不播放）；ready＝已載入還沒播過
+async function lClipPrep(c){
+  const a=lClipAudio();
+  const la=document.getElementById("laudio");if(la&&!la.paused)la.pause();
+  if(LClip.id===c.id&&LClip.state==="load")return false;  // 還在載入，忽略重複點擊／拖曳
+  if(LClip.id===c.id&&LClip.mkey===c.mkey&&a.readyState>=1)return true;
+  LClip.id=c.id;LClip.start=c.r[0];LClip.end=c.r[1];LClip.state="load";lClipUi();
+  if(LClip.first[c.id]===undefined)LClip.first[c.id]=now();
+  let u;try{u=await lClipUrl(c.mkey,c.raw)}catch(e){if(LClip.id===c.id){LClip.state="";lClipUi()}showToast("音檔載入失敗");return false}
+  if(LClip.id!==c.id)return false;
+  if(LClip.mkey!==c.mkey||a.src!==u){a.src=u;LClip.mkey=c.mkey}
+  if(a.readyState<1)await new Promise(r=>a.addEventListener("loadedmetadata",r,{once:true}));
+  if(LClip.id!==c.id)return false;
+  a.currentTime=c.r[0];LClip.state="ready";lClipUi();return true;
+}
 async function lPlayClip(id){
   const it=QM[id];if(!it)return;
   const c=lClipSrc(it.ex,it.q);if(!c){showToast("這題沒有時戳，請改用整段播放");return}
   const a=lClipAudio(),same=LClip.id===c.id&&LClip.mkey===c.mkey;
   if(same&&LClip.state==="play"){a.pause();return}
-  const resume=same&&LClip.state==="pause"&&a.currentTime>=c.r[0]&&a.currentTime<c.r[1]-0.3;
-  const la=document.getElementById("laudio");if(la&&!la.paused)la.pause();
-  LClip.id=c.id;LClip.start=c.r[0];LClip.end=c.r[1];LClip.state="load";lClipUi();
-  if(LClip.first[c.id]===undefined)LClip.first[c.id]=now();
-  let u;try{u=await lClipUrl(c.mkey,c.raw)}catch(e){if(LClip.id===c.id){LClip.state="";lClipUi()}showToast("音檔載入失敗");return}
-  if(LClip.id!==c.id)return;
-  if(LClip.mkey!==c.mkey||a.src!==u){a.src=u;LClip.mkey=c.mkey}
-  const go=()=>{if(!resume)a.currentTime=c.r[0];a.playbackRate=lRate;
-    a.play().catch(()=>{LClip.state="";lClipUi();showToast("瀏覽器擋下播放，請再按一次")})};
-  if(a.readyState>=1)go();else a.addEventListener("loadedmetadata",go,{once:true});
+  const resume=same&&(LClip.state==="pause"||LClip.state==="ready")&&a.currentTime>=c.r[0]&&a.currentTime<c.r[1]-0.3;
+  if(!await lClipPrep(c))return;
+  if(!resume)a.currentTime=c.r[0];
+  a.playbackRate=lRate;
+  a.play().catch(()=>{LClip.state="";lClipUi();showToast("瀏覽器擋下播放，請再按一次")});
+}
+// 播放器的時間軸與倒退／快轉：t 是片段內的秒數（rel＝相對目前位置）；播放中就繼續播，播完或暫停時停在新位置
+async function lClipSeek(id,t,rel){
+  const it=QM[id],c=it&&lClipSrc(it.ex,it.q);if(!c)return;
+  const a=lClipAudio();
+  if(!(LClip.id===c.id&&LClip.mkey===c.mkey&&LClip.state!=="load")&&!await lClipPrep(c))return;
+  const base=rel?a.currentTime:c.r[0];
+  a.currentTime=Math.min(Math.max(c.r[0],base+t),c.r[1]-0.05);
+  if(LClip.state==="done")LClip.state="pause";
+  lClipUi();
+}
+const lFmt=s=>{s=Math.max(0,Math.floor(s));return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")};
+function lClipTl(){
+  app.querySelectorAll(".l-player").forEach(p=>{
+    const tl=p.querySelector(".l-tl"),tt=p.querySelector(".l-tt");if(!tl)return;
+    const on=LClip.id===p.dataset.id&&LClip.au,pos=on?Math.max(0,LClip.au.currentTime-LClip.start):0;
+    if(!tl.matches(":active"))tl.value=pos;
+    if(tt)tt.textContent=lFmt(pos)+" / "+lFmt(+tl.max);
+  });
+}
+function lPlayerHTML(ex,q){
+  const c=lClipSrc(ex,q);if(!c)return "";
+  const dur=c.r[1]-c.r[0],pos=LClip.id===c.id&&LClip.au?Math.max(0,LClip.au.currentTime-c.r[0]):0,ci=esc(c.id);
+  return `<div class="l-player" data-id="${ci}">
+    <div class="l-prow"><button class="l-pbtn" data-act="lpseek" data-id="${ci}" data-s="-3" title="倒退 3 秒">−3s</button>${lClipBtn(ex,q)}<button class="l-pbtn" data-act="lpseek" data-id="${ci}" data-s="3" title="快轉 3 秒">+3s</button><span class="l-tt">${lFmt(pos)} / ${lFmt(dur)}</span></div>
+    <input type="range" class="l-tl" data-id="${ci}" min="0" max="${dur.toFixed(1)}" step="0.1" value="${pos.toFixed(1)}" aria-label="題組音檔播放位置">
+    ${lCtlChips(ex,q,true)}
+  </div>`;
 }
 function lClipLabel(id,isSet){
   const s=LClip.id===id?LClip.state:"";
@@ -1460,12 +1524,13 @@ function lClipLabel(id,isSet){
 function lClipUi(){
   app.querySelectorAll('[data-act="lclip"]').forEach(b=>{const s=LClip.id===b.dataset.id?LClip.state:"";
     b.textContent=lClipLabel(b.dataset.id,!!b.dataset.set);b.classList.toggle("ghost",s==="done");b.setAttribute("aria-pressed",s==="play")});
+  lClipTl();
 }
 function lClipBtn(ex,q){const c=lClipSrc(ex,q);if(!c)return "";const isSet=q.s!==undefined;
   return `<button class="l-clipbtn${LClip.id===c.id&&LClip.state==="done"?" ghost":""}" data-act="lclip" data-id="${esc(c.id)}"${isSet?' data-set="1"':""} aria-pressed="${LClip.id===c.id&&LClip.state==="play"}">${lClipLabel(c.id,isSet)}</button>`}
 // 倒退／快轉、語速、口音（逐題播放與隨機抽考共用）
-function lCtlChips(ex,q){
-  return `<div class="l-achips"><button data-act="lseek" data-s="-5" title="倒退 5 秒">-5s</button><button data-act="lseek" data-s="5" title="快轉 5 秒">+5s</button>
+function lCtlChips(ex,q,noSeek){
+  return `<div class="l-achips">${noSeek?"":`<button data-act="lseek" data-s="-5" title="倒退 5 秒">-5s</button><button data-act="lseek" data-s="5" title="快轉 5 秒">+5s</button>`}
     ${[0.85,1,1.15,1.25].map(r=>`<button class="${lRate===r?"on":""}" data-act="lrate" data-r="${r}">${r}x</button>`).join("")}
     ${q&&lHasAlt(ex,q)?`<button class="${!lAccAlt?"on":""}" data-act="lacc" data-alt="0">標準</button><button class="${lAccAlt?"on":""}" data-act="lacc" data-alt="1">英／澳口音</button>`:""}</div>`}
 // 檢討內容：判定、照片說明、翻譯、詳解、選項分析、詞彙、筆記
@@ -1482,6 +1547,13 @@ function lExpHTML(id,q,a){
   </div>`;
 }
 function lScriptHTML(S){
+  // 原文與翻譯行數相同（每位說話者一行）時逐句對照，可隱藏翻譯
+  const en=(S.script||"").split("\n").filter(x=>x.trim()),zh=(S.trans||"").split("\n").filter(x=>x.trim());
+  if(en.length&&en.length===zh.length)return `<div class="l-script2">
+    <div class="l-scr-head"><strong>聽力原文（滑鼠移到英文字可查字與存單字卡）</strong><button class="l-pbtn sm" data-act="ltr">${lHideTr?"顯示翻譯":"隱藏翻譯"}</button></div>
+    ${en.map((l,k)=>`<p class="l-ln">${glossHTML(l)}<span class="l-tr">${esc(zh[k])}</span></p>`).join("")}
+    ${S.voc?`<p class="l-voc"><strong>重點詞彙：</strong>${esc(S.voc)}</p>`:""}
+  </div>`;
   return `<div class="l-script">
     <div class="l-scr-col"><strong>聽力原文（滑鼠移到英文字可查字與存單字卡）</strong><div class="p-body">${glossHTML(S.script||"")}</div></div>
     <div class="l-scr-col"><strong>中文翻譯</strong><div class="p-body">${esc(S.trans||"")}</div></div>
@@ -1567,6 +1639,29 @@ function hydrateListeningMedia(){
     });
   });
 }
+// 整段播放交卷：auto＝音檔播完自動交卷（不詢問未作答；全都沒寫就只提示）
+function lSubmit(ex,auto){
+  const vis=lVisIdx(ex),p7d=st.p7d||{};
+  const un=vis.filter(i=>st.ans[ex.id+"-"+i]===undefined&&p7d[ex.id+"-"+i]===undefined);
+  const newIds=vis.map(i=>ex.id+"-"+i).filter(id=>st.ans[id]===undefined&&p7d[id]!==undefined);
+  if(!newIds.length){if(auto&&un.length)showToast("音檔播完了，還沒有作答");return}
+  if(!auto&&un.length>0&&!confirm(`還有 ${un.length} 題未作答，確定要先交卷檢討已作答的題目嗎？`))return;
+  const ms=elapsedFor("l|"+ex.id+"|"+(lPartTab||0));
+  const per=ms!=null?ms/newIds.length:null;
+  newIds.forEach(id=>{setAns(id,p7d[id]);logTime(id,per,okAns(QM[id].q,p7d[id]),{src:"e",set:newIds.length,sm:ms==null?null:Math.round(ms)})});
+  newIds.forEach(id=>{delete p7d[id]});QT.key=null;
+  save();render();window.scrollTo(0,0);
+  if(auto)showToast(`音檔播完，已自動交卷${un.length?`（${un.length} 題未作答）`:""}`);
+}
+function lToSetnav(){const el=document.getElementById("lsetnav");if(el)window.scrollTo({top:Math.max(0,el.getBoundingClientRect().top+window.scrollY-72)})}
+// 整段音檔：播完自動交卷；開始播放時停掉題組片段（ended／play 不會冒泡，用捕獲）
+document.addEventListener("ended",e=>{
+  if(e.target&&e.target.id==="laudio"&&st.view==="exam"){const ex=findEx(st.exam);if(ex&&ex.listen&&!lClipOn(ex))lSubmit(ex,true)}
+},true);
+document.addEventListener("play",e=>{if(e.target&&e.target.id==="laudio")lClipStop()},true);
+document.addEventListener("input",e=>{
+  if(e.target&&e.target.classList&&e.target.classList.contains("l-tl"))lClipSeek(e.target.dataset.id,+e.target.value,false);
+});
 document.addEventListener("change",e=>{
   if(e.target&&e.target.id==="lfolder"){
     const files=e.target.files||[];let cnt=0;
@@ -1645,8 +1740,20 @@ function vListening(){
   </div>`;
   }
   h+=sheetBlock("答案卡",`${doneCnt}/${vis.length}．答對 ${okCnt}`,cells);
+  // 逐題播放的 Part 3／4：一個題組一頁，上方題組切換；預設停在第一個還沒寫完的題組
+  const paged=lPaged(ex),pk=lPageKey(ex),setIdx=si=>vis.filter(i=>ex.qs[i].s===si);
+  const sis=paged?[...new Set(vis.map(i=>ex.qs[i].s))]:[];
+  let pageSi=null;
+  if(paged){
+    if(!sis.includes(lSetPage[pk]))lSetPage[pk]=sis.find(si=>setIdx(si).some(i=>st.ans[ex.id+"-"+i]===undefined))??sis[0];
+    pageSi=lSetPage[pk];
+    h+=`<div class="setnav" id="lsetnav" aria-label="題組切換">${sis.map(si=>{const ix=setIdx(si),done=ix.every(i=>st.ans[ex.id+"-"+i]!==undefined);
+      const ok=ix.filter(i=>st.ans[ex.id+"-"+i]!==undefined&&okAns(ex.qs[i],st.ans[ex.id+"-"+i])).length;
+      return `<button class="setchip${si===pageSi?" cur":""}${done?" done":""}" data-act="lsetpg" data-si="${si}" aria-current="${si===pageSi}">${ex.qs[ix[0]].n}–${ex.qs[ix[ix.length-1]].n}${done?`<small>${ok}/${ix.length}</small>`:""}</button>`}).join("")}</div>`;
+  }
   // 逐題播放：檢討完接著播下一個還沒作答的題目／題組
-  const nextBtn=i=>clip&&vis.some(j=>j>i&&st.ans[ex.id+"-"+j]===undefined)?`<div class="l-next"><button class="l-clipbtn" data-act="lnext" data-i="${i}">下一題並播放 ▶</button></div>`:"";
+  const nextBtn=i=>clip&&vis.some(j=>j>i&&st.ans[ex.id+"-"+j]===undefined)?`<div class="l-next"><button class="l-clipbtn" data-act="lnext" data-i="${i}">${paged?"下一組並播放":"下一題並播放"} ▶</button></div>`:"";
+  lWide=false;
 
   const renderQ=i=>{
     const id=ex.id+"-"+i,q=ex.qs[i],a=st.ans[id],rev=a!==undefined,sel=rev?a:st.p7d[id],fl=!!st.flags[id],qn=q.n||i+1;
@@ -1685,22 +1792,29 @@ function vListening(){
     if(q.s!==undefined&&ex.sets&&ex.sets[q.s]){
       const si=q.s,S=ex.sets[si],grp=[];
       while(idx<vis.length&&ex.qs[vis[idx]].s===si){grp.push(vis[idx]);idx++}
+      if(paged&&si!==pageSi)continue;
       const setRev=grp.every(gi=>st.ans[ex.id+"-"+gi]!==undefined);
       h+=`<section class="l-set" id="lset-${grp[0]}"><div class="l-set-head"><span class="l-set-title">${esc(S.refer||"")}</span>${setRev&&S.accent?`<span class="chip">${esc(S.accent)}</span>`:""}</div>`;
-      if(clip)h+=`<div class="l-clipctl">${lClipBtn(ex,q)}</div>`;
-      if(S.img)h+=lImgHTML(S.img,S.refer||"Graphic","l-graphic");
-      if(setRev)h+=lScriptHTML(S);
-      grp.forEach(gi=>{h+=renderQ(gi)});
-      if(setRev)h+=nextBtn(grp[grp.length-1]);
+      if(setRev){  // 檢討：左欄播放器（時間軸、倒退／快轉 3 秒）＋圖表＋原文，右欄題目與詳解
+        lWide=true;
+        h+=`<div class="l-rev"><div class="l-rev-l">${lPlayerHTML(ex,q)||'<div style="height:14px"></div>'}${S.img?lImgHTML(S.img,S.refer||"Graphic","l-graphic"):""}${lScriptHTML(S)}</div>
+          <div class="l-rev-r">${grp.map(renderQ).join("")}${nextBtn(grp[grp.length-1])}</div></div>`;
+      }else{
+        if(clip)h+=`<div class="l-clipctl">${lClipBtn(ex,q)}</div>`;
+        if(S.img)h+=lImgHTML(S.img,S.refer||"Graphic","l-graphic");
+        grp.forEach(gi=>{h+=renderQ(gi)});
+      }
       h+=`</section>`;
     }else{
       h+=renderQ(i);
       idx++;
     }
   }
+  if(paged){const k=sis.indexOf(pageSi),pv=sis[k-1],nx=sis[k+1];
+    h+=`<div class="l-pnav"><button class="btn" data-act="lsetpg" data-si="${pv}" ${pv===undefined?"disabled":""}>← 上一組</button><button class="btn" data-act="lsetpg" data-si="${nx}" ${nx===undefined?"disabled":""}>下一組 →</button></div>`}
   const filled=vis.filter(i=>{const id=ex.id+"-"+i;return st.ans[id]!==undefined||st.p7d[id]!==undefined}).length;
   if(!allDone&&!clip){
-    h+=`<div class="submitbar"><span class="note">${timerChip()}<br><span id="lsub-info">已選 ${filled}／${vis.length} 題</span>．整段音檔播完後可一次交卷檢討</span>
+    h+=`<div class="submitbar"><span class="note">${timerChip()}<br><span id="lsub-info">已選 ${filled}／${vis.length} 題</span>．音檔播完會自動交卷檢討</span>
       <button class="btn primary" id="lsub-btn" data-act="lsubmit" ${filled===0?"disabled":""}>交卷並檢討</button></div>`;
   }else if(allDone){
     h+=`<div class="result"><p><strong>完成：答對 ${okCnt}／${vis.length}（${Math.round(okCnt/vis.length*100)}%）</strong></p></div>`;
@@ -2002,6 +2116,7 @@ function render(){
   const curAud=document.getElementById("laudio");
   if(curAud&&curAud.playbackRate!==lRate)try{curAud.playbackRate=lRate}catch(e){}
   app.classList.toggle("readmode",isRead);document.body.classList.toggle("readmode",isRead);
+  app.classList.toggle("lwide",isListen&&lWide);document.body.classList.toggle("l-notr",lHideTr);
   if(isRead){const nl=document.getElementById("paneL"),nr=document.getElementById("paneR");
     if(keep&&nl&&nl.dataset.key===keep.k){nl.scrollTop=keep.l;if(!p7ResetR)nr.scrollTop=keep.r}
     p7ResetR=false}
@@ -2219,13 +2334,20 @@ document.addEventListener("click",e=>{
       const cell=app.querySelector(`[data-cell="${d.id}"]`);
       if(cell)cell.classList.add("sel");
       lUpdateDom(ex);return}
-    case"lgoto":{const el=document.getElementById("lq-"+d.i);if(el)el.scrollIntoView({behavior:"smooth",block:"center"});return}
+    case"lgoto":{const q=ex.qs[+d.i],pk=lPageKey(ex);
+      if(lPaged(ex)&&q&&q.s!==undefined&&lSetPage[pk]!==q.s){lSetPage[pk]=q.s;lClipStop();render()}
+      const el=document.getElementById("lq-"+d.i);if(el)el.scrollIntoView({behavior:"smooth",block:"center"});return}
+    case"lsetpg":{if(d.si===undefined||d.si==="undefined")return;lSetPage[lPageKey(ex)]=+d.si;lClipStop();render();lToSetnav();return}
+    case"lpseek":lClipSeek(d.id,+d.s,true);return;
+    case"ltr":{lHideTr=!lHideTr;try{localStorage.setItem("quiz-lhidetr",lHideTr?"1":"0")}catch(err){}
+      document.body.classList.toggle("l-notr",lHideTr);app.querySelectorAll('[data-act="ltr"]').forEach(b=>{b.textContent=lHideTr?"顯示翻譯":"隱藏翻譯"});return}
     case"lpart":{lPartTab=+d.p;render();window.scrollTo(0,0);return}
     case"lacc":{lAccAlt=d.alt==="1";lClipStop();render();return}
     case"lmode":{lClipMode=d.m==="1";try{localStorage.setItem("quiz-lclip",lClipMode?"1":"0")}catch(err){}
       lClipStop();const la=document.getElementById("laudio");if(la)la.pause();render();return}
     case"lclip":lPlayClip(d.id);return;
     case"lnext":{const vis=lVisIdx(ex),j=vis.find(x=>x>+d.i&&st.ans[ex.id+"-"+x]===undefined);if(j===undefined)return;
+      if(lPaged(ex)){lSetPage[lPageKey(ex)]=ex.qs[j].s;render();lToSetnav();lPlayClip(ex.id+"-"+j);return}
       const q=ex.qs[j],el=q.s!==undefined?document.getElementById("lset-"+ex.qs.findIndex(x=>x.s===q.s)):document.getElementById("lq-"+j);
       if(el)el.scrollIntoView({behavior:"smooth",block:"start"});lPlayClip(ex.id+"-"+j);return}
     case"lpnext":{const p=st.pr;if(!p||p.i>=p.ids.length-1)return;
@@ -2236,16 +2358,7 @@ document.addEventListener("click",e=>{
       if(au){au.currentTime=Math.max(0,(au.currentTime||0)+(+d.s))}return}
     case"lrate":{lRate=+d.r;const au=document.getElementById("laudio");if(au)au.playbackRate=lRate;if(LClip.au)LClip.au.playbackRate=lRate;
       app.querySelectorAll('[data-act="lrate"]').forEach(b=>b.classList.toggle("on",+b.dataset.r===lRate));return}
-    case"lsubmit":{const vis=lVisIdx(ex);
-      const un=vis.filter(i=>st.ans[ex.id+"-"+i]===undefined&&(st.p7d||{})[ex.id+"-"+i]===undefined);
-      if(un.length===vis.length)return;
-      if(un.length>0&&!confirm(`還有 ${un.length} 題未作答，確定要先交卷檢討已作答的題目嗎？`))return;
-      const ms=elapsedFor("l|"+ex.id+"|"+(lPartTab||0));
-      const newIds=vis.map(i=>ex.id+"-"+i).filter(id=>st.ans[id]===undefined&&(st.p7d||{})[id]!==undefined);
-      const per=ms!=null&&newIds.length?ms/newIds.length:null;
-      newIds.forEach(id=>{setAns(id,st.p7d[id]);logTime(id,per,okAns(QM[id].q,st.p7d[id]),{src:"e",set:newIds.length,sm:ms==null?null:Math.round(ms)})});
-      newIds.forEach(id=>{delete st.p7d[id]});QT.key=null;
-      save();render();window.scrollTo(0,0);return}
+    case"lsubmit":lSubmit(ex,false);return;
     case"lretryWrong":{const vis=lVisIdx(ex);let cnt=0;
       vis.forEach(i=>{const id=ex.id+"-"+i;if(isWrong(id)){delAns(id);if(st.p7d)delete st.p7d[id];cnt++}});
       if(!cnt){showToast("目前範圍沒有錯題");return}
