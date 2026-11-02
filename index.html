@@ -479,7 +479,7 @@ function buildIndex(){
 }
 /* ---------- AI應用規劃師題庫加密：輸入密碼後才在瀏覽器解密（PBKDF2-SHA256＋AES-256-GCM，加密見 tools/encrypt_ai.py） ---------- */
 // 這組密碼同時是「站長自用」的登入：解鎖成功（ok）才顯示統計、巨量資料、AI 等完整目錄
-const AILock={locked:[],msg:"",busy:false,ok:false,KEY:"quiz-ai-key",
+const AILock={locked:[],msg:"",busy:false,ok:false,key:null,KEY:"quiz-ai-key",
   b64:s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0)),
   async derive(pw,env){const base=await crypto.subtle.importKey("raw",new TextEncoder().encode(pw),"PBKDF2",false,["deriveKey"]);
     return crypto.subtle.deriveKey({name:"PBKDF2",hash:"SHA-256",salt:this.b64(env.salt),iterations:env.iter},base,{name:"AES-GCM",length:256},true,["decrypt"])},
@@ -490,7 +490,7 @@ const AILock={locked:[],msg:"",busy:false,ok:false,KEY:"quiz-ai-key",
   async unlock(key){const ds=[];for(const env of this.locked){
     if(env.pending){try{const r=await fetch("private/toeic_listening.json",{cache:"no-cache"});if(r.ok)ds.push(await r.json())}catch(e){}continue}
     ds.push(await this.open(env,key))}
-    ds.forEach(addData);this.locked=[];this.ok=true;buildIndex()},
+    ds.forEach(addData);this.locked=[];this.ok=true;this.key=key;buildIndex()},
   async tryPassword(pw,remember){const env=this.locked[0],key=await this.derive(pw,env);await this.unlock(key);
     if(remember)try{const k=new Uint8Array(await crypto.subtle.exportKey("raw",key));
       localStorage.setItem(this.KEY,JSON.stringify({salt:env.salt,k:btoa(String.fromCharCode(...k))}))}catch(e){}},
@@ -1394,13 +1394,52 @@ function vReading(){
   return h;
 }
 /* ---------- TOEIC 聽力測驗（Part 1–4 與聽力模擬考）：整段音檔連續播完、批次勾選後交卷檢討 ---------- */
-const LOCAL_MEDIA=new Map();
+const LOCAL_MEDIA=new Map(),ENC_MEDIA=new Map(),ENC_PENDING=new Map();
 let lPartTab=1,lAccAlt=false,lRate=1,lLastEx="";
-function mediaUrl(relPath){
-  if(!relPath)return "";
-  const base=relPath.split("/").pop();
+async function mediaHash(k){
+  const b=new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(k)));
+  return Array.from(b.slice(0,8),x=>x.toString(16).padStart(2,"0")).join("");
+}
+function mediaSync(mkey,rawPath){
+  if(!mkey)return "";
+  const base=(rawPath||mkey).split("/").pop();
   if(LOCAL_MEDIA.has(base))return LOCAL_MEDIA.get(base);
-  return encodeURI(relPath);
+  if(ENC_MEDIA.has(mkey))return ENC_MEDIA.get(mkey);
+  return "";
+}
+async function resolveMedia(mkey,mime,rawPath){
+  const sync=mediaSync(mkey,rawPath);if(sync)return sync;
+  if(ENC_PENDING.has(mkey))return ENC_PENDING.get(mkey);
+  const p=(async()=>{
+    if(AILock.key&&window.crypto&&crypto.subtle){
+      try{
+        const hid=await mediaHash(mkey);
+        const r=await fetch(DATA_DIR+"media/"+hid+".enc");
+        if(r.ok){
+          const buf=await r.arrayBuffer();
+          const plain=await crypto.subtle.decrypt({name:"AES-GCM",iv:new Uint8Array(buf,0,12)},AILock.key,new Uint8Array(buf,12));
+          const u=URL.createObjectURL(new Blob([plain],{type:mime}));
+          ENC_MEDIA.set(mkey,u);return u;
+        }
+      }catch(e){}
+    }
+    const u=encodeURI(rawPath);ENC_MEDIA.set(mkey,u);return u;
+  })().finally(()=>ENC_PENDING.delete(mkey));
+  ENC_PENDING.set(mkey,p);
+  return p;
+}
+function hydrateListeningMedia(){
+  app.querySelectorAll("[data-mkey]").forEach(el=>{
+    const mkey=el.dataset.mkey,raw=el.dataset.raw,mime=el.tagName==="AUDIO"?"audio/mpeg":"image/jpeg";
+    if(!mkey||el.dataset.resolved===mkey)return;
+    const sync=mediaSync(mkey,raw);
+    if(sync){el.src=sync;el.dataset.resolved=mkey;if(el.tagName==="AUDIO"&&el.playbackRate!==lRate)try{el.playbackRate=lRate}catch(e){}return}
+    resolveMedia(mkey,mime,raw).then(u=>{
+      if(!el.isConnected||el.dataset.mkey!==mkey)return;
+      el.src=u;el.dataset.resolved=mkey;
+      if(el.tagName==="AUDIO"&&el.playbackRate!==lRate)try{el.playbackRate=lRate}catch(e){}
+    });
+  });
 }
 document.addEventListener("change",e=>{
   if(e.target&&e.target.id==="lfolder"){
@@ -1431,7 +1470,7 @@ function vListening(){
     altRel=ex.partAudios[lPartTab].audioAlt||null;
   }
   const activeAud=(lAccAlt&&altRel)?altRel:audRel;
-  const audSrc=mediaUrl("TOEIC/TOEIC紅藍本/聽力/"+activeAud);
+  const audKey="audio/"+activeAud,audRaw="TOEIC/TOEIC紅藍本/聽力/"+activeAud,audSrc=mediaSync(audKey,audRaw);
   let doneCnt=0,okCnt=0;
   vis.forEach(i=>{const id=ex.id+"-"+i,a=st.ans[id];if(a!==undefined){doneCnt++;if(okAns(ex.qs[i],a))okCnt++}});
   const allDone=doneCnt===vis.length&&vis.length>0;
@@ -1454,11 +1493,10 @@ function vListening(){
       <span class="l-track">音檔：${esc(activeAud.split("/").pop())}</span>
       <div class="l-achips">
         ${altRel?`<button class="${!lAccAlt?"on":""}" data-act="lacc" data-alt="0">標準音檔</button><button class="${lAccAlt?"on":""}" data-act="lacc" data-alt="1">英／澳口音版</button>`:""}
-        <label class="linkbtn" style="font-size:.78rem;cursor:pointer" title="若在雲端網址無法直接讀取本機音檔與圖片，請點此選擇本機 TOEIC紅藍本 資料夾">選擇本機資料夾${LOCAL_MEDIA.size?`（已載入 ${LOCAL_MEDIA.size}）`:""}<input type="file" id="lfolder" webkitdirectory multiple hidden></label>
       </div>
     </div>
     <div class="l-audio-row">
-      <audio id="laudio" controls preload="metadata" src="${audSrc}" data-src="${audSrc}"></audio>
+      <audio id="laudio" controls preload="metadata" ${audSrc?`src="${audSrc}" data-resolved="${esc(audKey)}"`:""} data-mkey="${esc(audKey)}" data-raw="${esc(audRaw)}"></audio>
       <div class="l-achips">
         <button data-act="lseek" data-s="-5" title="倒退 5 秒">-5s</button>
         <button data-act="lseek" data-s="5" title="快轉 5 秒">+5s</button>
@@ -1478,7 +1516,8 @@ function vListening(){
         <button class="flagbtn ${fl?"on":""}" data-act="flag" data-id="${id}" aria-pressed="${fl}">${fl?"已標註":"標註"}</button>
       </div></div>`;
     if(isP1&&q.img){
-      qh+=`<div class="l-photo"><img src="${mediaUrl("TOEIC/TOEIC紅藍本/kb/img/"+q.img)}" alt="Question ${qn}" loading="lazy"></div>`;
+      const ik="img/"+q.img,ir="TOEIC/TOEIC紅藍本/kb/img/"+q.img,isrc=mediaSync(ik,ir);
+      qh+=`<div class="l-photo"><img ${isrc?`src="${isrc}" data-resolved="${esc(ik)}"`:""} data-mkey="${esc(ik)}" data-raw="${esc(ir)}" alt="Question ${qn}" loading="lazy"></div>`;
     }
     if(!isP1){
       if(isP2&&!rev)qh+=`<p class="note" style="margin:0 0 8px">請聽音檔問題與三個回答，選出最適當的回應。</p>`;
@@ -1516,7 +1555,10 @@ function vListening(){
       while(idx<vis.length&&ex.qs[vis[idx]].s===si){grp.push(vis[idx]);idx++}
       const setRev=grp.every(gi=>st.ans[ex.id+"-"+gi]!==undefined);
       h+=`<section class="l-set"><div class="l-set-head"><span class="l-set-title">${esc(S.refer||"")}</span>${setRev&&S.accent?`<span class="chip">${esc(S.accent)}</span>`:""}</div>`;
-      if(S.img)h+=`<div class="l-graphic"><img src="${mediaUrl("TOEIC/TOEIC紅藍本/kb/img/"+S.img)}" alt="${esc(S.refer||"Graphic")}" loading="lazy"></div>`;
+      if(S.img){
+        const ik="img/"+S.img,ir="TOEIC/TOEIC紅藍本/kb/img/"+S.img,isrc=mediaSync(ik,ir);
+        h+=`<div class="l-graphic"><img ${isrc?`src="${isrc}" data-resolved="${esc(ik)}"`:""} data-mkey="${esc(ik)}" data-raw="${esc(ir)}" alt="${esc(S.refer||"Graphic")}" loading="lazy"></div>`;
+      }
       if(setRev){
         h+=`<div class="l-script">
           <div class="l-scr-col"><strong>聽力原文（滑鼠移到英文字可查字與存單字卡）</strong><div class="p-body">${glossHTML(S.script||"")}</div></div>
@@ -1826,8 +1868,9 @@ function render(){
   app.innerHTML=v();
   if(oldAud){
     const newAud=document.getElementById("laudio");
-    if(newAud&&newAud.dataset.src===oldAud.dataset.src){newAud.replaceWith(oldAud)}
+    if(newAud&&newAud.dataset.mkey===oldAud.dataset.mkey){newAud.replaceWith(oldAud)}
   }
+  if(isListen)hydrateListeningMedia();
   const curAud=document.getElementById("laudio");
   if(curAud&&curAud.playbackRate!==lRate)try{curAud.playbackRate=lRate}catch(e){}
   app.classList.toggle("readmode",isRead);document.body.classList.toggle("readmode",isRead);
