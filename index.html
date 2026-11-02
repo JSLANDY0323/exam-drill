@@ -418,6 +418,32 @@ code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85em;backgroun
 .chtip{position:absolute;pointer-events:none;background:var(--ink);color:var(--on-ink);font-size:.78rem;padding:6px 9px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-110%);display:none;z-index:5}
 .trend{font-size:.92rem;margin:4px 0 0}
 .tree>li>.toprow{min-height:60px}
+/* 聽力測驗 */
+.l-audiobar{position:sticky;top:52px;z-index:8;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:12px 0 16px;box-shadow:0 4px 14px rgba(0,0,0,.06)}
+.l-audiotop{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;font-size:.82rem}
+.l-audiotop .l-track{font-weight:600;color:var(--ink);overflow-wrap:anywhere}
+.l-audio-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.l-audio-row audio{flex:1 1 240px;height:38px;min-width:200px}
+.l-achips{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.l-achips button{appearance:none;border:1px solid var(--line);background:var(--bg);color:var(--muted);border-radius:6px;padding:4px 9px;font-size:.78rem;cursor:pointer;font-variant-numeric:tabular-nums}
+.l-achips button.on{border-color:var(--ink);background:var(--ink);color:var(--on-ink)}
+.l-photo,.l-graphic{margin:10px 0 14px;text-align:center;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:10px;overflow:hidden}
+.l-photo img,.l-graphic img{max-width:100%;max-height:340px;height:auto;border-radius:6px;display:inline-block;vertical-align:middle}
+.opts.l-compact{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.opts.l-compact.c3{grid-template-columns:repeat(3,1fr)}
+.opts.l-compact .opt{justify-content:center;padding:11px 8px;font-weight:600}
+.opt.sel{border-color:var(--ink);background:var(--soft);font-weight:600}
+.opt.sel .bub{background:var(--ink);color:var(--on-ink);border-color:var(--ink)}
+.cell.sel{border-color:var(--ink);color:var(--ink);font-weight:700;background:var(--soft)}
+.l-set{border:1px solid var(--line);border-radius:12px;padding:16px;margin:18px 0;background:var(--bg)}
+.l-set-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.l-set-title{font-weight:700;font-size:.98rem}
+.l-script{display:grid;grid-template-columns:1fr 1fr;gap:14px;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:14px;margin:10px 0 16px;font-size:.92rem;line-height:1.68}
+.l-script strong{display:block;font-size:.8rem;color:var(--muted);margin-bottom:6px}
+.l-script .p-body{white-space:pre-line}
+.l-voc{grid-column:1/-1;border-top:1px solid var(--line);padding-top:8px;font-size:.85rem;color:var(--muted)}
+.l-set .panel{margin:12px 0 0;border-radius:10px}
+@media (max-width:640px){.l-script{grid-template-columns:1fr}.l-set{padding:12px 10px}}
 @media (max-width:560px){.kpis{grid-template-columns:repeat(2,1fr)}.stbl{font-size:.84rem}.stbl th,.stbl td{padding:8px 4px}}
 @media (prefers-reduced-motion:no-preference){.exp{animation:in .2s ease-out}@keyframes in{from{opacity:0}}}
 </style>
@@ -461,7 +487,9 @@ const AILock={locked:[],msg:"",busy:false,ok:false,KEY:"quiz-ai-key",
     const s=new Blob([raw]).stream();
     return JSON.parse(await new Response(env.gz?s.pipeThrough(new DecompressionStream("gzip")):s).text())},
   // 全部解開才載入；密碼錯誤時 decrypt 會丟出例外，題庫維持鎖定
-  async unlock(key){const ds=[];for(const env of this.locked)ds.push(await this.open(env,key));
+  async unlock(key){const ds=[];for(const env of this.locked){
+    if(env.pending){try{const r=await fetch("private/toeic_listening.json",{cache:"no-cache"});if(r.ok)ds.push(await r.json())}catch(e){}continue}
+    ds.push(await this.open(env,key))}
     ds.forEach(addData);this.locked=[];this.ok=true;buildIndex()},
   async tryPassword(pw,remember){const env=this.locked[0],key=await this.derive(pw,env);await this.unlock(key);
     if(remember)try{const k=new Uint8Array(await crypto.subtle.exportKey("raw",key));
@@ -580,6 +608,7 @@ function curSet(ex){const sets=p7Sets(ex),cur=st.cur[ex.id]||0;return sets.find(
 function timingKey(){
   if(!DATA_READY||QT.away||document.visibilityState!=="visible")return null;
   if(st.view==="exam"){const ex=findEx(st.exam);if(!ex)return null;
+    if(ex.listen){const v=lVisIdx(ex);return v.some(i=>st.ans[ex.id+"-"+i]===undefined)?"l|"+ex.id+"|"+(lPartTab||0):null}
     if(ex.part===6||ex.part===7){const set=curSet(ex);if(!set||p7Status(ex,set).done)return null;return "set|"+ex.id+"|"+set.p}
     const id=ex.id+"-"+(st.cur[ex.id]||0);return st.ans[id]===undefined?"q|"+id:null}
   if(st.view==="prac"&&st.pr&&st.pr.ids&&st.pr.ids.length){const id=st.pr.ids[st.pr.i];return st.pr.ans[id]===undefined?"p|"+id+"|"+st.pr.i:null}
@@ -602,7 +631,7 @@ const dayKey=t=>{const d=new Date(t);return d.getFullYear()+"-"+String(d.getMont
 function aggTime(list){let n=0,o=0,tn=0,ms=0;list.forEach(r=>{n++;if(r.ok)o++;if(r.ms!=null){tn++;ms+=r.ms}});return{n,o,tn,ms,acc:n?o/n:0,avg:tn?ms/tn:0}}
 function todayAgg(){const k=dayKey(now());return aggTime((st.tlog||[]).filter(r=>dayKey(r.t)===k))}
 function tlogCat(r){const it=QM[r.id];if(!it)return "其他";const ex=it.ex,sc=exScope(ex);
-  if(sc==="toeic")return "TOEIC Part "+(ex.part||5);
+  if(sc==="toeic")return "TOEIC Part "+(it.q.part||ex.part||5);
   return {stat:"統計學",bigdata:"巨量資料概論",ai_jr:"AI應用規劃師（初級）",ai_sr:"AI應用規劃師（中級）"}[sc]||"其他"}
 function timerChip(){const T=todayAgg();return `<span class="qtimer">計時 <b id="qtimer">0:00</b>${T.tn?`．今日平均 ${fmtDur(T.avg)}／題`:""}</span>`}
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -937,7 +966,9 @@ function passageHtml(ex,q,ansMap,gloss){
     return `<span class="blank">(${n})</span>`}).join("");
   return `<div class="passage"><p class="p-kind">${esc(P.kind||"")}</p>${P.head?`<p class="p-head">${g(P.head)}</p>`:""}<div class="p-body">${body}</div></div>`;
 }
-function passagePlain(ex,q){const P=(ex.passages||[])[q.p];if(!P)return "";
+function passagePlain(ex,q){
+  if(q.s!==undefined&&ex.sets&&ex.sets[q.s]){const S=ex.sets[q.s];return (S.refer?S.refer+"\n":"")+(S.script?S.script+"\n\n":"")}
+  const P=(ex.passages||[])[q.p];if(!P)return "";
   return (P.head?P.head+"\n\n":"")+P.text.replace(/\{\{(\d+)\}\}/g,(m0,n)=>`(${n}) ______`)+"\n\n"}
 function copyQuestion(id){
   const item=QM[id];if(!item)return;
@@ -1199,10 +1230,13 @@ function vHome(){
   return `<h1>目錄</h1><p class="sub">選擇資料夾開始練習</p>
   <ul class="tree"><li>${stat}</li><li>${bigdata}</li><li>${ai}</li><li>${toeic}</li></ul>`;
 }
-// TOEIC 的 Part 5／6／7；站長目錄放在 TOEIC 資料夾內，對外首頁直接放在最上層
+// TOEIC 的 聽力／閱讀／模擬考；站長目錄放在 TOEIC 資料夾內，對外首頁直接放在最上層
 function toeicItems(){
-  const p6all=TOEIC_EXAMS.filter(e=>e.part===6),p7all=TOEIC_EXAMS.filter(e=>e.part===7);
-  const p5all=TOEIC_EXAMS.filter(e=>(e.part||5)===5),byStage=n=>p5all.filter(e=>(e.stage||0)===n);
+  const p1all=TOEIC_EXAMS.filter(e=>e.part===1&&!e.mock),p2all=TOEIC_EXAMS.filter(e=>e.part===2&&!e.mock),
+        p3all=TOEIC_EXAMS.filter(e=>e.part===3&&!e.mock),p4all=TOEIC_EXAMS.filter(e=>e.part===4&&!e.mock);
+  const lMock=TOEIC_EXAMS.filter(e=>e.mock==="listening"),rMock=TOEIC_EXAMS.filter(e=>e.mock==="reading");
+  const p6all=TOEIC_EXAMS.filter(e=>e.part===6&&!e.mock),p7all=TOEIC_EXAMS.filter(e=>e.part===7&&!e.mock);
+  const p5all=TOEIC_EXAMS.filter(e=>(e.part===undefined?5:e.part)===5&&!e.mock),byStage=n=>p5all.filter(e=>(e.stage||0)===n);
   const sub=(key,name,list)=>`<li>${folder(key,name,groupMeta(list),list.map(examLeaf).join(""))}</li>`;
   // 文法歸文法、單字歸單字；第三階段（語意、搭配）與單字特訓放進單字，未分類的 stage 0 只剩全真模擬
   const s0=byStage(0),VOC0=["toeic_p5_vocab"],MIX0=["toeic_p5_full"];
@@ -1221,13 +1255,30 @@ function toeicItems(){
       sub("p5mix","綜合模擬",mix)+
       toolLeaf("每日 15 題．依真考題型比例","daily","toeic","")+
       `<li><button class="row" data-act="daily" data-scope="toeic" data-base="1"><span class="name">基礎每日 15 題．只出文法第一、二階段與單字題型練習，依比例分配</span><span class="meta"></span></button></li>`;
-  return `<li>${folder("p5","Part 5　單句填空",groupMeta(p5all),p5)}</li>`+
+  const rAll=[...p5all,...p6all,...p7all];
+  const reading=`<li>${folder("p5","Part 5　單句填空",groupMeta(p5all),p5)}</li>`+
       `<li>${folder("p6","Part 6　段落填空",groupMeta(p6all),p6all.map(examLeaf).join(""))}</li>`+
       `<li>${folder("p7","Part 7　閱讀測驗",groupMeta(p7all),p7all.map(examLeaf).join(""))}</li>`;
+  const lAll=[...p1all,...p2all,...p3all,...p4all];
+  const lockRow=txt=>`<li><button class="row" data-act="go" data-v="unlock"><span class="name">${txt}</span><span class="meta">需密碼解鎖</span></button></li>`;
+  const listening=lAll.length
+    ?`<li>${folder("p1","Part 1　照片描述",groupMeta(p1all),p1all.map(examLeaf).join(""))}</li>`+
+     `<li>${folder("p2","Part 2　應答問題",groupMeta(p2all),p2all.map(examLeaf).join(""))}</li>`+
+     `<li>${folder("p3","Part 3　簡短對話",groupMeta(p3all),p3all.map(examLeaf).join(""))}</li>`+
+     `<li>${folder("p4","Part 4　簡短獨白",groupMeta(p4all),p4all.map(examLeaf).join(""))}</li>`
+    :lockRow("輸入密碼解鎖聽力題庫（Part 1–4）");
+  const mockL=lMock.length?lMock.map(examLeaf).join(""):lockRow("輸入密碼解鎖聽力模擬考（第一回、第二回）");
+  const mockR=rMock.length?rMock.map(examLeaf).join("")
+    :`<li class="note" style="padding:8px 4px">第一回（待新增）</li><li class="note" style="padding:8px 4px">第二回（待新增）</li>`;
+  const mock=`<li>${folder("mock_l","聽力",lMock.length?groupMeta(lMock):"已加密",mockL)}</li>`+
+      `<li>${folder("mock_r","閱讀",rMock.length?groupMeta(rMock):"待新增",mockR)}</li>`;
+  return `<li>${folder("t_listen","聽力",lAll.length?groupMeta(lAll):"已加密",listening)}</li>`+
+      `<li>${folder("t_read","閱讀",groupMeta(rAll),reading)}</li>`+
+      `<li>${folder("t_mock","模擬考",lMock.length||rMock.length?groupMeta([...lMock,...rMock]):"聽力．閱讀",mock)}</li>`;
 }
 // 對外首頁：只有 TOEIC
 function vToeic(){const T=scopeStats("toeic");
-  return `<h1>TOEIC 閱讀練習</h1><p class="sub">Part 5 單句填空．Part 6 段落填空．Part 7 閱讀測驗．${T.d?`已作答 <b>${T.d}</b>／${T.n} 題`:`共 ${T.n} 題`}</p>
+  return `<h1>TOEIC 刷題練習</h1><p class="sub">聽力 Part 1–4．閱讀 Part 5–7．模擬考．${T.d?`已作答 <b>${T.d}</b>／${T.n} 題`:`共 ${T.n} 題`}</p>
   <ul class="tree">${toeicItems()}</ul>`;
 }
 
@@ -1342,6 +1393,154 @@ function vReading(){
   </div></div>`;
   return h;
 }
+/* ---------- TOEIC 聽力測驗（Part 1–4 與聽力模擬考）：整段音檔連續播完、批次勾選後交卷檢討 ---------- */
+const LOCAL_MEDIA=new Map();
+let lPartTab=1,lAccAlt=false,lRate=1,lLastEx="";
+function mediaUrl(relPath){
+  if(!relPath)return "";
+  const base=relPath.split("/").pop();
+  if(LOCAL_MEDIA.has(base))return LOCAL_MEDIA.get(base);
+  return encodeURI(relPath);
+}
+document.addEventListener("change",e=>{
+  if(e.target&&e.target.id==="lfolder"){
+    const files=e.target.files||[];let cnt=0;
+    for(const f of files){if(/\.(mp3|jpg|jpeg|png)$/i.test(f.name)){LOCAL_MEDIA.set(f.name,URL.createObjectURL(f));cnt++}}
+    if(cnt){showToast(`已連結本機檔案 ${cnt} 個`);render()}
+  }
+});
+function lVisIdx(ex){
+  if(!ex||!ex.qs)return [];
+  if(ex.mock==="listening"&&lPartTab>0)return ex.qs.map((q,i)=>q.part===lPartTab?i:-1).filter(i=>i>=0);
+  return ex.qs.map((_,i)=>i);
+}
+function lUpdateDom(ex){
+  const vis=lVisIdx(ex);
+  const filled=vis.filter(i=>{const id=ex.id+"-"+i;return st.ans[id]!==undefined||(st.p7d&&st.p7d[id]!==undefined)}).length;
+  const info=document.getElementById("lsub-info"),btn=document.getElementById("lsub-btn");
+  if(info)info.textContent=`已選 ${filled}／${vis.length} 題`;
+  if(btn)btn.disabled=filled===0;
+}
+function vListening(){
+  const ex=findEx(st.exam);if(!st.p7d||typeof st.p7d!=="object")st.p7d={};
+  if(lLastEx!==ex.id){lLastEx=ex.id;lPartTab=ex.mock==="listening"?1:0;lAccAlt=false}
+  const vis=lVisIdx(ex);
+  let audRel=ex.audio,altRel=ex.audioAlt;
+  if(ex.mock==="listening"&&lPartTab>0&&ex.partAudios&&ex.partAudios[lPartTab]){
+    audRel=ex.partAudios[lPartTab].audio||audRel;
+    altRel=ex.partAudios[lPartTab].audioAlt||null;
+  }
+  const activeAud=(lAccAlt&&altRel)?altRel:audRel;
+  const audSrc=mediaUrl("TOEIC/TOEIC紅藍本/聽力/"+activeAud);
+  let doneCnt=0,okCnt=0;
+  vis.forEach(i=>{const id=ex.id+"-"+i,a=st.ans[id];if(a!==undefined){doneCnt++;if(okAns(ex.qs[i],a))okCnt++}});
+  const allDone=doneCnt===vis.length&&vis.length>0;
+  let cells="";
+  vis.forEach(i=>{
+    const id=ex.id+"-"+i,q=ex.qs[i],a=st.ans[id],sel=st.p7d[id];
+    let c="cell";
+    if(a!==undefined)c+=okAns(q,a)?" ok":" bad";
+    else if(sel!==undefined)c+=" sel";
+    if(st.flags[id])c+=" fl";
+    cells+=`<button class="${c}" data-act="lgoto" data-i="${i}" data-cell="${id}" aria-label="第 ${q.n||i+1} 題">${q.n||i+1}</button>`;
+  });
+  let h=`${backHome}<h1>${esc(ex.title)}</h1>`;
+  if(ex.mock==="listening"){
+    const tabs=[[1,"Part 1 (1–6)"],[2,"Part 2 (7–31)"],[3,"Part 3 (32–70)"],[4,"Part 4 (71–100)"],[0,"整回 (1–100)"]];
+    h+=`<div class="chips" role="tablist" aria-label="大題切換">${tabs.map(([k,n])=>`<button role="tab" aria-selected="${lPartTab===k}" class="${lPartTab===k?"on":""}" data-act="lpart" data-p="${k}">${n}</button>`).join("")}</div>`;
+  }
+  h+=`<div class="l-audiobar" id="laudiobar">
+    <div class="l-audiotop">
+      <span class="l-track">音檔：${esc(activeAud.split("/").pop())}</span>
+      <div class="l-achips">
+        ${altRel?`<button class="${!lAccAlt?"on":""}" data-act="lacc" data-alt="0">標準音檔</button><button class="${lAccAlt?"on":""}" data-act="lacc" data-alt="1">英／澳口音版</button>`:""}
+        <label class="linkbtn" style="font-size:.78rem;cursor:pointer" title="若在雲端網址無法直接讀取本機音檔與圖片，請點此選擇本機 TOEIC紅藍本 資料夾">選擇本機資料夾${LOCAL_MEDIA.size?`（已載入 ${LOCAL_MEDIA.size}）`:""}<input type="file" id="lfolder" webkitdirectory multiple hidden></label>
+      </div>
+    </div>
+    <div class="l-audio-row">
+      <audio id="laudio" controls preload="metadata" src="${audSrc}" data-src="${audSrc}"></audio>
+      <div class="l-achips">
+        <button data-act="lseek" data-s="-5" title="倒退 5 秒">-5s</button>
+        <button data-act="lseek" data-s="5" title="快轉 5 秒">+5s</button>
+        ${[0.85,1,1.15,1.25].map(r=>`<button class="${lRate===r?"on":""}" data-act="lrate" data-r="${r}">${r}x</button>`).join("")}
+      </div>
+    </div>
+  </div>`;
+  h+=sheetBlock("答案卡",`${doneCnt}/${vis.length}．答對 ${okCnt}`,cells);
+
+  const renderQ=i=>{
+    const id=ex.id+"-"+i,q=ex.qs[i],a=st.ans[id],rev=a!==undefined,sel=rev?a:st.p7d[id],fl=!!st.flags[id],qn=q.n||i+1;
+    const isP1=q.part===1,isP2=q.part===2,hideTxt=(isP1||isP2)&&!rev;
+    let qh=`<div class="panel" id="lq-${i}" data-qid="${esc(id)}"><div class="qtop">
+      <span class="qno">第 ${qn} 題${rev&&TAGS[q.g]?`<span class="chip">${TAGS[q.g].n}</span>`:""}${rev&&q.accent?`<span class="chip">${esc(q.accent)}</span>`:""}</span>
+      <div class="qactions">
+        ${rev?`<button class="copybtn" data-act="copy" data-id="${id}" title="複製此題、選項與解析">複製</button>`:""}
+        <button class="flagbtn ${fl?"on":""}" data-act="flag" data-id="${id}" aria-pressed="${fl}">${fl?"已標註":"標註"}</button>
+      </div></div>`;
+    if(isP1&&q.img){
+      qh+=`<div class="l-photo"><img src="${mediaUrl("TOEIC/TOEIC紅藍本/kb/img/"+q.img)}" alt="Question ${qn}" loading="lazy"></div>`;
+    }
+    if(!isP1){
+      if(isP2&&!rev)qh+=`<p class="note" style="margin:0 0 8px">請聽音檔問題與三個回答，選出最適當的回應。</p>`;
+      else qh+=`<p class="qtext">${rev?glossHTML(q.q):esc(q.q)}</p>`;
+    }else if(!rev){
+      qh+=`<p class="note" style="margin:0 0 8px">請聽音檔四個敘述，選出最符合照片內容的選項。</p>`;
+    }
+    qh+=`<div class="opts ${hideTxt?"l-compact"+(isP2?" c3":""):""}">`;
+    q.o.forEach((t,k)=>{
+      let c="opt";
+      if(rev){if(okAns(q,k))c+=" right";else if(k===a)c+=" wrong"}
+      else if(sel===k)c+=" sel";
+      qh+=`<button class="${c}" data-act="lpick" data-id="${id}" data-k="${k}" ${rev?"disabled":""}><span class="bub">${L[k]}</span>${hideTxt?"":`<span>${rev?glossHTML(t):esc(t)}</span>`}</button>`;
+    });
+    qh+=`</div>`;
+    if(rev){
+      const g=okAns(q,a),lt=lastTime(id);
+      qh+=`<div class="exp ${g?"":"isbad"}">
+        <p class="verdict">${g?"答對":"答錯．你選 ("+L[a]+")"}，正解 ${keyTxt(q)}${lt&&lt.ms!=null?`<span class="vtime">．平均 ${fmtDur(lt.ms)}</span>`:""}</p>
+        ${isP1&&q.imgDesc?`<div class="qtrans"><strong>圖片說明　</strong>${esc(q.imgDesc)}</div>`:""}
+        ${q.trans?`<div class="qtrans"><strong>中文翻譯　</strong>${esc(q.trans)}</div>`:""}
+        ${q.e?`<p class="qexp-text"><strong>詳解　</strong>${esc(q.e)}</p>`:""}
+        ${q.w?`<div class="qopt-breakdown">${wHTML(q.w)}</div>`:""}
+        ${q.voc?`<p class="note" style="margin-top:6px"><strong>詞彙：</strong>${esc(q.voc)}</p>`:""}
+        ${noteBox(id)}
+      </div>`;
+    }
+    return qh+`</div>`;
+  };
+
+  for(let idx=0;idx<vis.length;){
+    const i=vis[idx],q=ex.qs[i];
+    if(q.s!==undefined&&ex.sets&&ex.sets[q.s]){
+      const si=q.s,S=ex.sets[si],grp=[];
+      while(idx<vis.length&&ex.qs[vis[idx]].s===si){grp.push(vis[idx]);idx++}
+      const setRev=grp.every(gi=>st.ans[ex.id+"-"+gi]!==undefined);
+      h+=`<section class="l-set"><div class="l-set-head"><span class="l-set-title">${esc(S.refer||"")}</span>${setRev&&S.accent?`<span class="chip">${esc(S.accent)}</span>`:""}</div>`;
+      if(S.img)h+=`<div class="l-graphic"><img src="${mediaUrl("TOEIC/TOEIC紅藍本/kb/img/"+S.img)}" alt="${esc(S.refer||"Graphic")}" loading="lazy"></div>`;
+      if(setRev){
+        h+=`<div class="l-script">
+          <div class="l-scr-col"><strong>聽力原文（滑鼠移到英文字可查字與存單字卡）</strong><div class="p-body">${glossHTML(S.script||"")}</div></div>
+          <div class="l-scr-col"><strong>中文翻譯</strong><div class="p-body">${esc(S.trans||"")}</div></div>
+          ${S.voc?`<div class="l-voc"><strong>重點詞彙：</strong>${esc(S.voc)}</div>`:""}
+        </div>`;
+      }
+      grp.forEach(gi=>{h+=renderQ(gi)});
+      h+=`</section>`;
+    }else{
+      h+=renderQ(i);
+      idx++;
+    }
+  }
+  const filled=vis.filter(i=>{const id=ex.id+"-"+i;return st.ans[id]!==undefined||st.p7d[id]!==undefined}).length;
+  if(!allDone){
+    h+=`<div class="submitbar"><span class="note">${timerChip()}<br><span id="lsub-info">已選 ${filled}／${vis.length} 題</span>．整段音檔播完後可一次交卷檢討</span>
+      <button class="btn primary" id="lsub-btn" data-act="lsubmit" ${filled===0?"disabled":""}>交卷並檢討</button></div>`;
+  }else{
+    h+=`<div class="result"><p><strong>完成：答對 ${okCnt}／${vis.length}（${Math.round(okCnt/vis.length*100)}%）</strong></p></div>`;
+  }
+  h+=`<div class="tools">${doneCnt?`<button data-act="lretryWrong">錯題重做</button><button data-act="lredo">清除本頁重做</button>`:""}<button data-act="resetExam">清除整卷紀錄</button></div>`;
+  return h;
+}
 function vExam(){
   const ex=findEx(st.exam),cur=st.cur[ex.id]||0,s=examStats(ex),id=ex.id+"-"+cur;
   let h=`${backHome}<h1>${esc(ex.title)}</h1>`;
@@ -1413,7 +1612,7 @@ function vReport(){
 }
 
 /* ---------- 進步曲線：只畫有作答的日子 ---------- */
-const CAT_ORDER=["TOEIC Part 5","TOEIC Part 6","TOEIC Part 7","統計學","巨量資料概論","AI應用規劃師（初級）","AI應用規劃師（中級）","其他"];
+const CAT_ORDER=["TOEIC Part 1","TOEIC Part 2","TOEIC Part 3","TOEIC Part 4","TOEIC Part 5","TOEIC Part 6","TOEIC Part 7","統計學","巨量資料概論","AI應用規劃師（初級）","AI應用規劃師（中級）","其他"];
 function firstOnly(L){const seen=new Set();return L.filter(r=>{if(seen.has(r.id))return false;seen.add(r.id);return true})}
 function niceTime(v){const c=[30e3,60e3,90e3,120e3,180e3,240e3,300e3,600e3,900e3,1200e3,1800e3,3600e3];for(const x of c)if(x>=v*1.08)return x;return Math.ceil(v/3600e3)*3600e3}
 function lineChart(pts,o){ // pts:[{lab,y,tip}]（y 為 null 時不畫點）
@@ -1616,11 +1815,21 @@ function render(){
       (st.view==="prac"&&(st.pr.scope||"toeic")==="toeic");
     if(!toeicOnly){st.view="home";st.scope="toeic"}
   }
-  const isRead=st.view==="exam"&&(findEx(st.exam).part===7||findEx(st.exam).part===6);
-  const v=isRead?vReading:({home:isOwner()?vHome:vToeic,exam:vExam,pset:vPset,prac:vPrac,report:vReport,sync:vSync,stats:vStats,notes:vNotes,vocab:vVocab,unlock:vUnlock}[st.view]||vHome);
+  const curEx=st.view==="exam"?findEx(st.exam):null;
+  const isRead=!!curEx&&(curEx.part===7||curEx.part===6);
+  const isListen=!!curEx&&!!curEx.listen;
+  const v=isListen?vListening:isRead?vReading:({home:isOwner()?vHome:vToeic,exam:vExam,pset:vPset,prac:vPrac,report:vReport,sync:vSync,stats:vStats,notes:vNotes,vocab:vVocab,unlock:vUnlock}[st.view]||vHome);
   const pl=document.getElementById("paneL"),pr=document.getElementById("paneR");
   const keep=pl&&pr?{k:pl.dataset.key,l:pl.scrollTop,r:pr.scrollTop}:null;
+  const oldAud=isListen?document.getElementById("laudio"):null;
+  if(oldAud)oldAud.remove();
   app.innerHTML=v();
+  if(oldAud){
+    const newAud=document.getElementById("laudio");
+    if(newAud&&newAud.dataset.src===oldAud.dataset.src){newAud.replaceWith(oldAud)}
+  }
+  const curAud=document.getElementById("laudio");
+  if(curAud&&curAud.playbackRate!==lRate)try{curAud.playbackRate=lRate}catch(e){}
   app.classList.toggle("readmode",isRead);document.body.classList.toggle("readmode",isRead);
   if(isRead){const nl=document.getElementById("paneL"),nr=document.getElementById("paneR");
     if(keep&&nl&&nl.dataset.key===keep.k){nl.scrollTop=keep.l;if(!p7ResetR)nr.scrollTop=keep.r}
@@ -1675,7 +1884,7 @@ function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random
 function toTop(){window.scrollTo(0,0)}
 function qTop(){const el=app.querySelector(".panel");if(!el)return;
   const r=el.getBoundingClientRect();if(r.top<64||r.top>window.innerHeight*0.6)el.scrollIntoView({block:"start"})}
-const p5Ids=base=>Object.keys(QM).filter(id=>{const e=QM[id].ex;return e.kind==="toeic"&&(e.part||5)===5&&(!base||(e.stage>=1&&e.stage<=3))});
+const p5Ids=base=>Object.keys(QM).filter(id=>{const e=QM[id].ex;return e.kind==="toeic"&&(e.part===undefined?5:e.part)===5&&!e.mock&&(!base||(e.stage>=1&&e.stage<=3))});
 // 真考 Part 5 題型比例（w＝一回 30 題中的約略題數；依據見 readme「TOEIC Part 5：題型比例」）
 const P5_MIX=[
   {n:"詞性",w:8,g:["t_p5pos","t_pos","t_p5noun"]},
@@ -1804,6 +2013,38 @@ document.addEventListener("click",e=>{
       if(!confirm("清除這個題組的作答，重新作答？"))return;
       set.idx.forEach(i=>{delAns(ex.id+"-"+i);if(st.p7d)delete st.p7d[ex.id+"-"+i]});p7ResetR=true;save();render();
       const r=document.getElementById("paneR");if(r)r.scrollTop=0;return}
+    case"lpick":{if(!st.p7d||typeof st.p7d!=="object")st.p7d={};
+      if(st.ans[d.id]!==undefined)return;
+      st.p7d[d.id]=+d.k;persist();
+      const card=app.querySelector(`[data-qid="${d.id}"]`);
+      if(card)card.querySelectorAll(".opt").forEach((b,idx)=>b.classList.toggle("sel",idx===+d.k));
+      const cell=app.querySelector(`[data-cell="${d.id}"]`);
+      if(cell)cell.classList.add("sel");
+      lUpdateDom(ex);return}
+    case"lgoto":{const el=document.getElementById("lq-"+d.i);if(el)el.scrollIntoView({behavior:"smooth",block:"center"});return}
+    case"lpart":{lPartTab=+d.p;render();window.scrollTo(0,0);return}
+    case"lacc":{lAccAlt=d.alt==="1";render();return}
+    case"lseek":{const au=document.getElementById("laudio");if(au){au.currentTime=Math.max(0,(au.currentTime||0)+(+d.s))}return}
+    case"lrate":{lRate=+d.r;const au=document.getElementById("laudio");if(au)au.playbackRate=lRate;
+      app.querySelectorAll('[data-act="lrate"]').forEach(b=>b.classList.toggle("on",+b.dataset.r===lRate));return}
+    case"lsubmit":{const vis=lVisIdx(ex);
+      const un=vis.filter(i=>st.ans[ex.id+"-"+i]===undefined&&(st.p7d||{})[ex.id+"-"+i]===undefined);
+      if(un.length===vis.length)return;
+      if(un.length>0&&!confirm(`還有 ${un.length} 題未作答，確定要先交卷檢討已作答的題目嗎？`))return;
+      const ms=elapsedFor("l|"+ex.id+"|"+(lPartTab||0));
+      const newIds=vis.map(i=>ex.id+"-"+i).filter(id=>st.ans[id]===undefined&&(st.p7d||{})[id]!==undefined);
+      const per=ms!=null&&newIds.length?ms/newIds.length:null;
+      newIds.forEach(id=>{setAns(id,st.p7d[id]);logTime(id,per,okAns(QM[id].q,st.p7d[id]),{src:"e",set:newIds.length,sm:ms==null?null:Math.round(ms)})});
+      newIds.forEach(id=>{delete st.p7d[id]});QT.key=null;
+      save();render();window.scrollTo(0,0);return}
+    case"lretryWrong":{const vis=lVisIdx(ex);let cnt=0;
+      vis.forEach(i=>{const id=ex.id+"-"+i;if(isWrong(id)){delAns(id);if(st.p7d)delete st.p7d[id];cnt++}});
+      if(!cnt){showToast("目前範圍沒有錯題");return}
+      save();render();window.scrollTo(0,0);return}
+    case"lredo":{const vis=lVisIdx(ex);
+      if(!confirm("清除目前顯示範圍的作答紀錄，重新作答？"))return;
+      vis.forEach(i=>{const id=ex.id+"-"+i;delAns(id);if(st.p7d)delete st.p7d[id]});
+      save();render();window.scrollTo(0,0);return}
     case"resetExam":if(!confirm(`確定清除「${ex.title}」的作答紀錄？標註會保留。`))return;
       ex.qs.forEach((q,i)=>{delAns(ex.id+"-"+i);if(st.p7d)delete st.p7d[ex.id+"-"+i]});st.cur[ex.id]=0;scroll=toTop;break;
     case"syncConnect":{
