@@ -435,6 +435,7 @@ code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85em;backgroun
 .opt.sel{border-color:var(--ink);background:var(--soft);font-weight:600}
 .opt.sel .bub{background:var(--ink);color:var(--on-ink);border-color:var(--ink)}
 .cell.sel{border-color:var(--ink);color:var(--ink);font-weight:700;background:var(--soft)}
+.l-sq{margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
 .l-set{border:1px solid var(--line);border-radius:12px;padding:16px;margin:18px 0;background:var(--bg)}
 .l-set-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
 .l-set-title{font-weight:700;font-size:.98rem}
@@ -638,7 +639,9 @@ function timingKey(){
     if(ex.listen){const v=lVisIdx(ex);return v.some(i=>st.ans[ex.id+"-"+i]===undefined)?"l|"+ex.id+"|"+(lPartTab||0):null}
     if(ex.part===6||ex.part===7){const set=curSet(ex);if(!set||p7Status(ex,set).done)return null;return "set|"+ex.id+"|"+set.p}
     const id=ex.id+"-"+(st.cur[ex.id]||0);return st.ans[id]===undefined?"q|"+id:null}
-  if(st.view==="prac"&&st.pr&&st.pr.ids&&st.pr.ids.length){const id=st.pr.ids[st.pr.i];return st.pr.ans[id]===undefined?"p|"+id+"|"+st.pr.i:null}
+  if(st.view==="prac"&&st.pr&&st.pr.ids&&st.pr.ids.length){const id=st.pr.ids[st.pr.i],g=prGroup(id);
+    if(g.length>1)return g.some(x=>st.pr.ans[x]===undefined)?"pg|"+g[0]:null;  // 聽力題組整頁一起計時
+    return st.pr.ans[id]===undefined?"p|"+id+"|"+st.pr.i:null}
   return null}
 function syncTimer(){const k=timingKey();if(k!==QT.key){QT.key=k;QT.start=k?now():0}tickTimer()}
 function elapsedFor(k){return QT.key===k&&QT.start?now()-QT.start:null}
@@ -1208,7 +1211,8 @@ function card(id,num,ansMap,showSrc){
 
 function gridCell(id,label,ansMap,cur,act,idx){
   const a=ansMap[id],q=QM[id].q;let c="cell";
-  if(a!==undefined)c+=okAns(q,a)?" ok":" bad";if(cur)c+=" cur";if(st.flags[id])c+=" fl";
+  if(a!==undefined)c+=okAns(q,a)?" ok":" bad";else if(st.pr&&ansMap===st.pr.ans&&st.pr.dr&&st.pr.dr[id]!==undefined)c+=" sel";
+  if(cur)c+=" cur";if(st.flags[id])c+=" fl";
   return `<button class="${c}" data-act="${act}" data-i="${idx}" aria-label="第 ${label} 題">${label}</button>`;
 }
 const legend=`<div class="legend"><span><i style="background:var(--ink)"></i>答對</span><span><i style="background:var(--mid)"></i>答錯</span><span><i style="border:1px solid var(--faint)"></i>未作答</span><span><i style="background:var(--ink);border-radius:50%;transform:scale(.8)"></i>標註</span></div>`;
@@ -1290,7 +1294,7 @@ function toeicItems(){
   const lAll=[...p1all,...p2all,...p3all,...p4all];
   const lockRow=txt=>`<li><button class="row" data-act="go" data-v="unlock"><span class="name">${txt}</span><span class="meta">需密碼解鎖</span></button></li>`;
   const listening=lAll.length
-    ?(lAll.some(lHasClips)?toolLeaf("隨機抽考 10 題．Part 1–4 混合，逐題播放、寫一題檢討一題","lrand","toeic",""):"")+
+    ?(lAll.some(lHasClips)?toolLeaf("隨機抽考 10 題．Part 1–4 混合，逐題播放，題組三題同一頁、寫完再對答案","lrand","toeic",""):"")+
      `<li>${folder("p1","Part 1　照片描述",groupMeta(p1all),p1all.map(examLeaf).join(""))}</li>`+
      `<li>${folder("p2","Part 2　應答問題",groupMeta(p2all),p2all.map(examLeaf).join(""))}</li>`+
      `<li>${folder("p3","Part 3　簡短對話",groupMeta(p3all),p3all.map(examLeaf).join(""))}</li>`+
@@ -1564,7 +1568,43 @@ function lImgHTML(file,alt,cls){
   const ik="img/"+file,ir="TOEIC/TOEIC紅藍本/kb/img/"+file,isrc=mediaSync(ik,ir);
   return `<div class="${cls}"><img ${isrc?`src="${isrc}" data-resolved="${esc(ik)}"`:""} data-mkey="${esc(ik)}" data-raw="${esc(ir)}" alt="${esc(alt)}" loading="lazy"></div>`;
 }
-// 隨機抽考用的聽力題卡：一題一頁，題組題目各自一頁、共用同一個片段；作答走一般抽考流程（data-act="pick"）
+// 抽考裡和這題同一個聽力題組的題目（同一頁顯示）；題組的作答先暫存在 st.pr.dr，整組選完才一起批改
+function prGroup(id){const p=st.pr,it=QM[id];if(!p||!it||!it.ex.listen||it.q.s===undefined)return [id];
+  const {ex,q}=it;return p.ids.filter(x=>QM[x]&&QM[x].ex===ex&&QM[x].q.s===q.s)}
+// 抽考的上一頁／下一頁：跳過目前題組的其他題目；沒有了回傳 -1
+function prStep(d){const p=st.pr,g=prGroup(p.ids[p.i]);let j=p.i+d;
+  while(j>=0&&j<p.ids.length&&g.includes(p.ids[j]))j+=d;return j>=0&&j<p.ids.length?j:-1}
+function lOptsHTML(id,q,a,da,hideTxt){const rev=a!==undefined;
+  let h=`<div class="opts ${hideTxt?"l-compact"+(q.part===2?" c3":""):""}">`;
+  q.o.forEach((t,k)=>{let c="opt";if(rev){if(okAns(q,k))c+=" right";else if(k===a)c+=" wrong"}else if(k===da)c+=" sel";
+    h+=`<button class="${c}" data-act="pick" data-id="${id}" data-k="${k}" ${rev?"disabled":""}><span class="bub">${L[k]}</span>${hideTxt?"":`<span>${rev?glossHTML(t):esc(t)}</span>`}</button>`});
+  return h+`</div>`;
+}
+// 隨機抽考的聽力題組：同組題目放在同一頁、共用一個片段；選的答案先暫存（可改），整組選完才一起批改。
+// 檢討時和章節練習一樣左右分欄：左欄播放器＋圖表＋原文，右欄題目與詳解（設 lWide 讓版面變寬）
+function lSetCard(grp,ansMap,showSrc){
+  const p=st.pr,{ex,q}=QM[grp[0]],S=ex.sets[q.s],dr=p.dr||{},rev=grp.every(x=>ansMap[x]!==undefined);
+  const nums=grp.map(x=>p.ids.indexOf(x)+1),nd=grp.filter(x=>dr[x]!==undefined).length;
+  const qh=(id,j)=>{const x=QM[id].q,a=ansMap[id],fl=!!st.flags[id];
+    return `<div class="qtop">
+    <span class="qno">第 ${nums[j]} 題<span class="chip">${TAGS[x.g]?TAGS[x.g].n:""}</span></span>
+    <div class="qactions">
+      <button class="copybtn" data-act="copy" data-id="${id}" title="複製此題、選項與解析">複製</button>
+      <button class="flagbtn ${fl?"on":""}" data-act="flag" data-id="${id}" aria-pressed="${fl}">${fl?"已標註":"標註"}</button>
+    </div></div>
+    <p class="qtext">${a!==undefined?glossHTML(x.q):esc(x.q)}</p>${lOptsHTML(id,x,a,dr[id],false)}${a!==undefined?lExpHTML(id,x,a):""}`};
+  const title=`第 ${nums.join("、")} 題．題組`,src=showSrc?`<p class="src">出自${qLabel(grp[0])}</p>`:"";
+  if(rev){lWide=true;
+    return `<section class="l-set"><div class="l-set-head"><span class="l-set-title">${title}．${esc(S.refer||"")}</span>${S.accent?`<span class="chip">${esc(S.accent)}</span>`:""}</div>${src}
+      <div class="l-rev"><div class="l-rev-l">${lPlayerHTML(ex,q)||'<div style="height:14px"></div>'}${S.img?lImgHTML(S.img,S.refer||"Graphic","l-graphic"):""}${lScriptHTML(S)}</div>
+      <div class="l-rev-r">${grp.map((id,j)=>`<div class="panel" data-qid="${esc(id)}">${qh(id,j)}</div>`).join("")}</div></div></section>`}
+  let h=`<div class="panel"><div class="qtop"><span class="qno">${title}</span>${timerChip()}</div>${src}`;
+  h+=`<p class="l-set-title" style="margin:0 0 10px">${esc(S.refer||"")}</p><div class="l-clipctl">${lClipBtn(ex,q)}${lCtlChips(ex,q)}</div>`;
+  if(S.img)h+=lImgHTML(S.img,S.refer||"Graphic","l-graphic");
+  grp.forEach((id,j)=>{h+=`<div class="l-sq" data-qid="${esc(id)}">${qh(id,j)}</div>`});
+  return h+`<p class="note" style="margin-top:10px">${grp.length} 題都選完後一起對答案（已選 ${nd}／${grp.length}，選完前可以改）。</p></div>`;
+}
+// 隨機抽考用的聽力單題題卡（題組改由 lSetCard 整組一頁）；作答走一般抽考流程（data-act="pick"）
 function lCard(id,num,ansMap,showSrc){
   const {ex,q}=QM[id],a=ansMap[id],rev=a!==undefined,fl=!!st.flags[id],qn=q.n;
   const isP1=q.part===1,isP2=q.part===2,hideTxt=(isP1||isP2)&&!rev,S=q.s!==undefined&&ex.sets?ex.sets[q.s]:null;
@@ -1582,10 +1622,7 @@ function lCard(id,num,ansMap,showSrc){
   if(isP1&&!rev)h+=`<p class="note" style="margin:0 0 8px">請聽四個敘述，選出最符合照片內容的選項。</p>`;
   else if(isP2&&!rev)h+=`<p class="note" style="margin:0 0 8px">請聽問題與三個回答，選出最適當的回應。</p>`;
   else if(!isP1)h+=`<p class="qtext">${rev?glossHTML(q.q):esc(q.q)}</p>`;
-  h+=`<div class="opts ${hideTxt?"l-compact"+(isP2?" c3":""):""}">`;
-  q.o.forEach((t,k)=>{let c="opt";if(rev){if(okAns(q,k))c+=" right";else if(k===a)c+=" wrong"}
-    h+=`<button class="${c}" data-act="pick" data-id="${id}" data-k="${k}" ${rev?"disabled":""}><span class="bub">${L[k]}</span>${hideTxt?"":`<span>${rev?glossHTML(t):esc(t)}</span>`}</button>`});
-  h+=`</div>`;
+  h+=lOptsHTML(id,q,a,undefined,hideTxt);
   if(rev){
     h+=lExpHTML(id,q,a);
     // 原文含其他題的答案：同一回抽考裡這個題組的題目都寫完才顯示
@@ -1852,16 +1889,17 @@ function vPset(){
 function vPrac(){
   const p=st.pr,id=p.ids[p.i];let ok=0,done=0;
   p.ids.forEach(x=>{if(p.ans[x]!==undefined){done++;if(okAns(QM[x].q,p.ans[x]))ok++}});
-  let h=`${backHome}<h1>${p.title||"隨機抽考"}</h1><p class="sub">${scopeName(p.scope||"toeic")}${p.mix?`．依真考題型比例：${p.mix}`:""}${p.src==="lrand"?"．逐題播放，選完立刻檢討；抽考作答不會覆蓋原本試卷的紀錄":""}</p>`;
+  let h=`${backHome}<h1>${p.title||"隨機抽考"}</h1><p class="sub">${scopeName(p.scope||"toeic")}${p.mix?`．依真考題型比例：${p.mix}`:""}${p.src==="lrand"?"．逐題播放，Part 1／2 選完立刻檢討，Part 3／4 題組三題同一頁、都選完再一起檢討；抽考作答不會覆蓋原本試卷的紀錄":""}</p>`;
   if(done===p.ids.length)h+=`<div class="result"><p><strong>完成：答對 ${ok}／${p.ids.length}（${Math.round(ok/p.ids.length*100)}%）</strong></p>${p.src==="daily"?`<p class="note" style="margin-top:-6px">檢討時把錯題分成兩類記下來：結構／文法錯 → 寫「漏看了哪個訊號」；單字／搭配錯 → 只抄核心搭配詞組。</p>`:""}
   ${p.src==="nrev"?`<p class="note" style="margin-top:-6px">答對的筆記排到下一階段，答錯的明天再複習。</p><div class="row-btns"><button class="btn primary" data-act="go" data-v="notes">回筆記複習</button><button class="btn" data-act="go" data-v="home">回目錄</button></div>`
     :`<div class="row-btns"><button class="btn primary" data-act="pstartAgain">再抽一回</button><button class="btn" data-act="go" data-v="home">回目錄</button></div>`}</div>`;
-  let cells="";p.ids.forEach((x,j)=>{cells+=gridCell(x,j+1,p.ans,j===p.i,"pgoto",j)});
+  const grp=prGroup(id);lWide=false;  // 聽力題組整組一頁（檢討時 lSetCard 會設 lWide）
+  let cells="";p.ids.forEach((x,j)=>{cells+=gridCell(x,j+1,p.ans,grp.includes(x),"pgoto",j)});
   h+=sheetBlock("答案卡",`${done}/${p.ids.length}．答對 ${ok}`,cells);
   const lis=QM[id].ex.listen;  // 聽力：下一題換到別的片段時自動播放
-  h+=`${card(id,p.i+1,p.ans,true)}
-  <div class="nav"><button class="btn" data-act="prev" ${p.i===0?"disabled":""}>上一題</button>
-  <button class="btn primary" data-act="${lis?"lpnext":"next"}" ${p.i===p.ids.length-1?"disabled":""}>下一題</button></div>
+  h+=`${grp.length>1?lSetCard(grp,p.ans,true):card(id,p.i+1,p.ans,true)}
+  <div class="nav"><button class="btn" data-act="prev" ${prStep(-1)<0?"disabled":""}>上一題</button>
+  <button class="btn primary" data-act="${lis?"lpnext":"next"}" ${prStep(1)<0?"disabled":""}>下一題</button></div>
   <div class="tools"><button data-act="optFirst">選項先看：${st.optFirst?"開":"關"}</button></div>`;
   return h;
 }
@@ -2116,7 +2154,7 @@ function render(){
   const curAud=document.getElementById("laudio");
   if(curAud&&curAud.playbackRate!==lRate)try{curAud.playbackRate=lRate}catch(e){}
   app.classList.toggle("readmode",isRead);document.body.classList.toggle("readmode",isRead);
-  app.classList.toggle("lwide",isListen&&lWide);document.body.classList.toggle("l-notr",lHideTr);
+  app.classList.toggle("lwide",(isListen||st.view==="prac")&&lWide);document.body.classList.toggle("l-notr",lHideTr);
   if(isRead){const nl=document.getElementById("paneL"),nr=document.getElementById("paneR");
     if(keep&&nl&&nl.dataset.key===keep.k){nl.scrollTop=keep.l;if(!p7ResetR)nr.scrollTop=keep.r}
     p7ResetR=false}
@@ -2205,7 +2243,7 @@ function newDaily(base,n=15){
   return {ids:shuffle(ids),ans:{},i:0,src:"daily",base:!!base,scope:"toeic",mix,title:base?"基礎每日 15 題":"每日 15 題"};
 }
 // 聽力隨機抽考：從章節練習（不含模擬考）抽，Part 1／2 一題一單位、Part 3／4 一個題組（3 題）一單位，
-// 抽到滿 n 題為止；最多 2 個含錯題的單位，其餘優先出沒寫過的。逐題播放片段，寫一題、檢討一題。
+// 抽到滿 n 題為止；最多 2 個含錯題的單位，其餘優先出沒寫過的。逐題播放片段，單題寫一題檢討一題；題組三題放同一頁（lSetCard），寫完再一起檢討。
 function newLRand(n=10){
   const units=[];
   TOEIC_EXAMS.filter(e=>e.listen&&!e.mock).forEach(ex=>{const seen=new Set();
@@ -2240,7 +2278,15 @@ document.addEventListener("click",e=>{
     case"pgoto":st.pr.i=+d.i;scroll=qTop;break;
     case"pick":{const k=+d.k,q=QM[d.id].q,pr=st.view==="prac";
       if(pr?st.pr.ans[d.id]!==undefined:st.ans[d.id]!==undefined)break;
-      const ms=elapsedFor(pr?"p|"+d.id+"|"+st.pr.i:"q|"+d.id);
+      const grp=pr?prGroup(d.id):[d.id],ms=elapsedFor(grp.length>1?"pg|"+grp[0]:pr?"p|"+d.id+"|"+st.pr.i:"q|"+d.id);
+      if(grp.length>1){  // 聽力題組：先暫存（可改），整組都選了才一起批改；作答時間＝題組頁的計時平均分給每題
+        const p=st.pr;if(!p.dr)p.dr={};p.dr[d.id]=k;
+        if(!grp.every(x=>p.dr[x]!==undefined))break;
+        const per=ms!=null?ms/grp.length:null;QT.key=null;
+        grp.forEach(x=>{const ok=okAns(QM[x].q,p.dr[x]);p.ans[x]=p.dr[x];if(p.src==="nrev")nrevGrade(x,ok);
+          logTime(x,per,ok,{src:"p"});delete p.dr[x]});
+        if(!p.end&&p.ids.every(x=>p.ans[x]!==undefined))p.end=now();
+        break}
       if(pr){st.pr.ans[d.id]=k;if(!st.pr.end&&st.pr.ids.every(x=>st.pr.ans[x]!==undefined))st.pr.end=now();
         if(st.pr.src==="nrev")nrevGrade(d.id,okAns(q,k))}else setAns(d.id,k);
       logTime(d.id,ms,okAns(q,k),{src:pr?"p":"e"});QT.key=null;break}
@@ -2273,10 +2319,10 @@ document.addEventListener("click",e=>{
       if(p.src==="pset"){st.scope=p.scope;ids=shuffle([...poolIds(p.pool)]).slice(0,p.n);
         if(!ids.length){st.view="pset";scroll=toTop;break}}
       else{st.pr=newDaily(p.base);st.view="prac";scroll=toTop;break}
-      st.pr={...p,ids,ans:{},i:0};st.view="prac";scroll=toTop;break;
+      st.pr={...p,ids,ans:{},dr:{},i:0};st.view="prac";scroll=toTop;break;
     }
-    case"prev":if(st.view==="prac")st.pr.i--;else st.cur[st.exam]=(st.cur[st.exam]||0)-1;scroll=qTop;break;
-    case"next":if(st.view==="prac")st.pr.i++;else st.cur[st.exam]=(st.cur[st.exam]||0)+1;scroll=qTop;break;
+    case"prev":if(st.view==="prac"){const j=prStep(-1);if(j>=0)st.pr.i=j}else st.cur[st.exam]=(st.cur[st.exam]||0)-1;scroll=qTop;break;
+    case"next":if(st.view==="prac"){const j=prStep(1);if(j>=0)st.pr.i=j}else st.cur[st.exam]=(st.cur[st.exam]||0)+1;scroll=qTop;break;
     case"report":st.view="report";scroll=toTop;break;
     case"pset":st.view="pset";scroll=toTop;break;
     case"presume":st.view="prac";scroll=toTop;break;
@@ -2350,8 +2396,8 @@ document.addEventListener("click",e=>{
       if(lPaged(ex)){lSetPage[lPageKey(ex)]=ex.qs[j].s;render();lToSetnav();lPlayClip(ex.id+"-"+j);return}
       const q=ex.qs[j],el=q.s!==undefined?document.getElementById("lset-"+ex.qs.findIndex(x=>x.s===q.s)):document.getElementById("lq-"+j);
       if(el)el.scrollIntoView({behavior:"smooth",block:"start"});lPlayClip(ex.id+"-"+j);return}
-    case"lpnext":{const p=st.pr;if(!p||p.i>=p.ids.length-1)return;
-      const cur=QM[p.ids[p.i]],c0=cur&&lClipSrc(cur.ex,cur.q);p.i++;
+    case"lpnext":{const p=st.pr,j=p?prStep(1):-1;if(j<0)return;
+      const cur=QM[p.ids[p.i]],c0=cur&&lClipSrc(cur.ex,cur.q);p.i=j;
       const nx=QM[p.ids[p.i]],c1=nx&&nx.ex.listen&&lClipSrc(nx.ex,nx.q);
       save();render();qTop();if(c1&&!(c0&&c0.id===c1.id))lPlayClip(p.ids[p.i]);return}
     case"lseek":{const au=LClip.au&&!LClip.au.paused||!document.getElementById("laudio")?LClip.au:document.getElementById("laudio");
