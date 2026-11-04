@@ -755,9 +755,7 @@ function glSentence(el){
     const ends=[...["\n",". ","? ","! "].map(p=>txt.indexOf(p,off)).filter(i=>i>=0).map(i=>i+1),txt.length];txt=txt.slice(b+1,Math.min(...ends))}
   const fill=(box.closest(".qtext")||{}).dataset;
   if(fill&&fill.fill)txt=txt.replace(/_{3,}/,fill.fill);
-  return txt.replace(/\s+/g," ").trim().slice(0
-  
-  ,300)}
+  return txt.replace(/\s+/g," ").trim().slice(0,300)}
 const glSrc=el=>el?.closest("[data-qid]")?.dataset.qid||(st.view==="prac"&&st.pr?st.pr.ids[st.pr.i]:st.view==="exam"?st.exam+"-"+(st.cur[st.exam]||0):"");
 const glTip=document.createElement("div");glTip.className="gltip";glTip.hidden=true;glTip.setAttribute("role","tooltip");document.body.appendChild(glTip);
 let glOn=[],glCur=null,glTm=0;
@@ -1322,10 +1320,9 @@ function toeicItems(){
      `<li>${folder("p4","Part 4　簡短獨白",groupMeta(p4all),p4all.map(examLeaf).join(""))}</li>`
     :lockRow("輸入密碼解鎖聽力題庫（Part 1–4）");
   const mockL=lMock.length?lMock.map(examLeaf).join(""):lockRow("輸入密碼解鎖聽力模擬考（第一回、第二回）");
-  const mockR=rMock.length?rMock.map(examLeaf).join("")
-    :`<li class="note" style="padding:8px 4px">第一回（待新增）</li><li class="note" style="padding:8px 4px">第二回（待新增）</li>`;
+  const mockR=rMock.length?rMock.map(examLeaf).join(""):lockRow("輸入密碼解鎖閱讀模擬考（第一回、第二回）");
   const mock=`<li>${folder("mock_l","聽力",lMock.length?groupMeta(lMock):"已加密",mockL)}</li>`+
-      `<li>${folder("mock_r","閱讀",rMock.length?groupMeta(rMock):"待新增",mockR)}</li>`;
+      `<li>${folder("mock_r","閱讀",rMock.length?groupMeta(rMock):"已加密",mockR)}</li>`;
   return `<li>${folder("t_listen","聽力",lAll.length?groupMeta(lAll):"已加密",listening)}</li>`+
       `<li>${folder("t_read","閱讀",groupMeta(rAll),reading)}</li>`+
       `<li>${folder("t_mock","模擬考",lMock.length||rMock.length?groupMeta([...lMock,...rMock]):"聽力．閱讀",mock)}</li>`;
@@ -1979,7 +1976,7 @@ const mockList=k=>TOEIC_EXAMS.filter(e=>e.mock===k);
 // [代碼, 名稱, 可用, 不可用時的說明]
 function pfKinds(){const lock=AILock.locked.length?"需密碼解鎖":"待新增";
   return [["l","聽力題",TOEIC_EXAMS.some(e=>e.listen&&!e.mock&&lHasClips(e)),lock],["r","閱讀題",true,""],
-    ["ml","聽力整份模擬考",mockList("listening").length>0,lock],["mr","閱讀整份模擬考",mockList("reading").length>0,"待新增"]]}
+    ["ml","聽力整份模擬考",mockList("listening").length>0,lock],["mr","閱讀整份模擬考",mockList("reading").length>0,lock]]}
 function pfCfg(){
   const ok=pfKinds().filter(k=>k[2]).map(k=>k[0]),kind=ok.includes(PF.kind)?PF.kind:ok[0];
   const all=kind==="l"?[1,2,3,4]:[5,6,7],parts=(Array.isArray(PF[kind+"p"])?PF[kind+"p"]:all).filter(x=>all.includes(x));
