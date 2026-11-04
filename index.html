@@ -1996,7 +1996,7 @@ function newQuiz(c){
   const ids=pfIds(c);
   if(c.kind==="l")return {...newLRand(c.n,ids),cfg:c};
   if(pfP5Mode(c)&&c.p5!=="rand")return {...newDaily(c.p5==="base",c.n),cfg:c};
-  return {ids:shuffle([...ids]).slice(0,c.n),ans:{},i:0,src:"pset",pool:c.pool,n:c.n,scope:c.scope,cfg:c,
+  return {ids:shuffle(freshFirst(ids,drawInfo()).slice(0,c.n)),ans:{},i:0,src:"pset",pool:c.pool,n:c.n,scope:c.scope,cfg:c,
     title:c.kind==="r"?"閱讀隨機抽考":c.kind==="l"?"聽力隨機抽考":"隨機抽考"};
 }
 function vPset(){
@@ -2376,9 +2376,20 @@ const P5_MIX=[
   {n:"關係詞與子句",w:1,g:["t_p5rel","t_p5ncl"]},
   {n:"其他文法",w:1.5,g:["t_p5qty","t_p5det","t_p5comp","t_p5deg","t_p5part","t_p5ger","t_p5caus","t_p5inv","t_p5subj","t_grammar"]}
 ];
+/* 抽題的優先順序：依刷題紀錄 tlog（試卷與抽考都會記）找每題最近一次作答。抽考作答不寫進 st.ans，
+   只看 st.ans 的話，同一批錯題每次都會被抽到。
+   review＝錯題複習：試卷做錯、之後還沒答對過、且 3 天內沒做過；fresh＝試卷與抽考都沒做過；recent＝3 天內做過（排到最後）。 */
+const RECENT_MS=3*864e5;
+function drawInfo(){const m=new Map(),lim=now()-RECENT_MS;
+  (st.tlog||[]).forEach(r=>{const o=m.get(r.id);if(!o||r.t>=o.t)m.set(r.id,r)});
+  const recent=id=>{const r=m.get(id);return !!r&&r.t>=lim};
+  return {recent,fresh:id=>st.ans[id]===undefined&&!m.has(id),
+    review:id=>{const r=m.get(id);return isWrong(id)&&!recent(id)&&!(r&&r.ok)}}}
+// 洗牌後把 3 天內做過的移到最後
+function freshFirst(list,D,isRecent){const s=shuffle([...list]),f=isRecent||D.recent;return s.filter(x=>!f(x)).concat(s.filter(f))}
 // Part 5 依比例抽考（隨機抽考頁只勾 Part 5、範圍全部題目時）：依 P5_MIX 分配各題型題數（基礎版沒有的題型按比例分給其他題型）；
 // 每類先給整數題數，剩下的名額依小數部分隨機分配，長期平均符合比例。
-// 各類內最多合計 3 題錯題複習，其餘優先出沒寫過的題目。不限時：寫一題、檢討一題。
+// 各類內最多合計 3 題錯題複習（drawInfo 的 review），其餘先出沒做過的，3 天內做過的最後。不限時：寫一題、檢討一題。
 function newDaily(base,n=15){
   const all=p5Ids(base),byTag={};P5_MIX.forEach(c=>c.g.forEach(g=>byTag[g]=c));
   const pools=P5_MIX.map(c=>({c,ids:all.filter(id=>byTag[QM[id].q.g]===c)})).filter(x=>x.ids.length);
@@ -2389,10 +2400,10 @@ function newDaily(base,n=15){
     let r=Math.random()*R,j=0;while(j<pools.length-1&&r>=rem[j]){r-=rem[j];j++}
     pools[R>0?j:Math.floor(Math.random()*pools.length)].take++;
   }
-  let wrLeft=3;const ids=[];
+  let wrLeft=3;const ids=[],D=drawInfo();
   shuffle([...pools]).forEach(x=>{
-    const wr=shuffle(x.ids.filter(isWrong)).slice(0,Math.min(wrLeft,x.take));wrLeft-=wr.length;
-    const un=shuffle(x.ids.filter(id=>st.ans[id]===undefined)),rest=shuffle(x.ids.filter(id=>st.ans[id]!==undefined&&!wr.includes(id)));
+    const wr=shuffle(x.ids.filter(D.review)).slice(0,Math.min(wrLeft,x.take));wrLeft-=wr.length;
+    const un=shuffle(x.ids.filter(D.fresh)),rest=freshFirst(x.ids.filter(id=>!D.fresh(id)&&!wr.includes(id)),D);
     ids.push(...[...new Set([...wr,...un,...rest])].slice(0,x.take));
   });
   const mix=pools.filter(x=>x.take).map(x=>x.c.n+" "+x.take).join("．");
@@ -2400,7 +2411,7 @@ function newDaily(base,n=15){
 }
 // 聽力隨機抽考：Part 1／2 一題一單位、Part 3／4 一個題組（3 題）一單位，抽到滿 n 題為止；
 // pool＝候選題（隨機抽考頁篩好的，題組只要有一題在內就整組出），沒給時從章節練習（不含模擬考）有時戳的題目抽。
-// 最多 2 個含錯題的單位，其餘優先出沒寫過的。逐題播放片段，單題寫一題檢討一題；題組三題放同一頁（lSetCard），寫完再一起檢討。
+// 最多 2 個含錯題複習（drawInfo 的 review）的單位，其餘先出整個沒做過的，3 天內做過的最後。逐題播放片段，單題寫一題檢討一題；題組三題放同一頁（lSetCard），寫完再一起檢討。
 function newLRand(n=10,pool){
   const inP=pool?new Set(pool):null,units=[];
   TOEIC_EXAMS.filter(e=>e.listen&&(inP||!e.mock)).forEach(ex=>{const seen=new Set();
@@ -2410,8 +2421,8 @@ function newLRand(n=10,pool){
       const u=ex.qs.map((x,j)=>x.s===q.s?ex.id+"-"+j:null).filter(Boolean);
       if(inP?u.some(id=>inP.has(id)):ex.sets[q.s]&&ex.sets[q.s].t)units.push(u);
     })});
-  const wr=shuffle(units.filter(u=>u.some(isWrong))).slice(0,2),un=shuffle(units.filter(u=>u.every(id=>st.ans[id]===undefined)));
-  const rest=shuffle(units.filter(u=>!wr.includes(u)&&!un.includes(u))),pick=[];let cnt=0;
+  const D=drawInfo(),wr=shuffle(units.filter(u=>u.some(D.review))).slice(0,2),un=shuffle(units.filter(u=>u.every(D.fresh)));
+  const rest=freshFirst(units.filter(u=>!wr.includes(u)&&!un.includes(u)),D,u=>u.some(D.recent)),pick=[];let cnt=0;
   for(const u of [...new Set([...wr,...un,...rest])]){if(cnt>=n)break;pick.push(u);cnt+=u.length}
   return {ids:shuffle(pick).flat(),ans:{},i:0,src:"lrand",n,scope:"toeic",title:"聽力隨機抽考"};
 }
