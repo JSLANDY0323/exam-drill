@@ -755,7 +755,9 @@ function glSentence(el){
     const ends=[...["\n",". ","? ","! "].map(p=>txt.indexOf(p,off)).filter(i=>i>=0).map(i=>i+1),txt.length];txt=txt.slice(b+1,Math.min(...ends))}
   const fill=(box.closest(".qtext")||{}).dataset;
   if(fill&&fill.fill)txt=txt.replace(/_{3,}/,fill.fill);
-  return txt.replace(/\s+/g," ").trim().slice(0,300)}
+  return txt.replace(/\s+/g," ").trim().slice(0
+  
+  ,300)}
 const glSrc=el=>el?.closest("[data-qid]")?.dataset.qid||(st.view==="prac"&&st.pr?st.pr.ids[st.pr.i]:st.view==="exam"?st.exam+"-"+(st.cur[st.exam]||0):"");
 const glTip=document.createElement("div");glTip.className="gltip";glTip.hidden=true;glTip.setAttribute("role","tooltip");document.body.appendChild(glTip);
 let glOn=[],glCur=null,glTm=0;
