@@ -15,6 +15,7 @@
 | bigdata_past.json ／ bigdata_mock.json | 巨量資料概論 考古題／模擬考 |
 | ai_jr.enc.json | AI應用規劃師 初級（章節模擬試題；加密） |
 | ai_sr_common.enc.json | AI應用規劃師 中級 科目一 人工智慧技術應用與規劃（必考；加密） |
+| toeic_listening.enc.json ／ toeic_reading_mock.enc.json | TOEIC 聽力題庫、閱讀模擬考第一回／第二回（紅藍本；加密，明文在 private/） |
 | ai_sr_bd.enc.json ／ ai_sr_ml.enc.json | AI應用規劃師 中級 科目二 大數據處理分析與應用／科目三 機器學習技術與應用（擇一報考；加密） |
 
 AI應用規劃師題庫受著作權保護：明文放在專案的 `private/`（不上傳），改完後執行 `py tools/encrypt_ai.py` 產生這裡的 `*.enc.json`。
