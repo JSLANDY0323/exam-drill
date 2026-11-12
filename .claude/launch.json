@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "quiz",
+      "runtimeExecutable": "py",
+      "runtimeArgs": ["-m", "http.server", "8000"],
+      "port": 8000
+    },
+    {
+      "name": "quiz-plain-preview",
+      "runtimeExecutable": "py",
+      "runtimeArgs": ["-m", "http.server", "8123", "-d", "C:/Users/andy.lai/AppData/Local/Temp/claude/e055902e77f41da7/5aef0aee-526b-49fb-b68d-a5d7b9365a51/scratchpad/preview"],
+      "port": 8123
+    }
+  ]
+}

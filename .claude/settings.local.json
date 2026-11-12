@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(python --version)",
+      "PowerShell(py --version)",
+      "PowerShell(python -c \"import hashlib,sys;d=open\\('data/toeic_p6.json','rb'\\).read\\(\\);print\\(hashlib.md5\\(d\\).hexdigest\\(\\)[:8],hashlib.sha1\\(d\\).hexdigest\\(\\)[:8],hashlib.sha256\\(d\\).hexdigest\\(\\)[:8]\\)\")",
+      "PowerShell(python -c \"import hashlib,json;d=open\\('data/toeic_p6.json','rb'\\).read\\(\\);print\\(hashlib.md5\\(d\\).hexdigest\\(\\)[:8],hashlib.sha1\\(d\\).hexdigest\\(\\)[:8],hashlib.sha256\\(d\\).hexdigest\\(\\)[:8]\\);o=json.loads\\(d\\);print\\(hashlib.md5\\(json.dumps\\(o,ensure_ascii=False,separators=\\(',',':'\\)\\).encode\\(\\)\\).hexdigest\\(\\)[:8], hashlib.sha256\\(json.dumps\\(o,ensure_ascii=False,separators=\\(',',':'\\),sort_keys=True\\).encode\\(\\)\\).hexdigest\\(\\)[:8]\\)\")",
+      "PowerShell(python -c \"print\\(1\\)\"; echo \"exit $LASTEXITCODE\"; \\(Get-Command python\\).Source)",
+      "PowerShell(py -c \"print\\(1\\)\"; echo \"exit $LASTEXITCODE\"; Get-Command node -ErrorAction SilentlyContinue | Select-Object Source)",
+      "PowerShell(py -c \"import hashlib,json;d=open\\('data/toeic_p6.json','rb'\\).read\\(\\);print\\(hashlib.md5\\(d\\).hexdigest\\(\\)[:8],hashlib.sha1\\(d\\).hexdigest\\(\\)[:8],hashlib.sha256\\(d\\).hexdigest\\(\\)[:8]\\);o=json.loads\\(d\\);s=json.dumps\\(o,ensure_ascii=False,separators=\\(',',':'\\)\\);print\\(hashlib.md5\\(s.encode\\(\\)\\).hexdigest\\(\\)[:8],hashlib.sha256\\(s.encode\\(\\)\\).hexdigest\\(\\)[:8],hashlib.sha1\\(s.encode\\(\\)\\).hexdigest\\(\\)[:8]\\)\")",
+      "PowerShell(py -c \"import hashlib;d=open\\('data/tags.json','rb'\\).read\\(\\);print\\(hashlib.md5\\(d\\).hexdigest\\(\\)[:8],hashlib.sha1\\(d\\).hexdigest\\(\\)[:8],hashlib.sha256\\(d\\).hexdigest\\(\\)[:8]\\)\")",
+      "PowerShell(py \"C:\\\\Users\\\\landy\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\G---------Quiz-app\\\\a42a2f66-94b7-47ec-bfe4-9567e241d356\\\\scratchpad\\\\check_merge.py\" \"G:\\\\我的雲端硬碟\\\\Quiz_app\")"
+    ]
+  }
+}
