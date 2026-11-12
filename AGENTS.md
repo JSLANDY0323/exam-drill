@@ -30,14 +30,20 @@
 | `tools/make_glossary.py` | 產生檢討用單字／片語提示詞典 data/glossary/toeic.json（不要手改該檔） | readme.md「程式架構」單字提示；改完 TOEIC 題庫後重跑 |
 | `tools/glossary_extra.json` | 詞典的人工補充（繁體釋義、補片語、drop 誤判片語） | 同上 |
 | `tools/encrypt_ai.py` | 加密 private/ → data/*.enc.json | 需要使用者輸入密碼 |
-| `TOEIC/TOEIC紅藍本/` | 紅藍本（Hackers 聽力／閱讀題庫大全）四本 PDF、聽力音檔、`kb/` Markdown 知識庫與 `kb/img/` 題目照片／圖表（市售書，**不可上傳**，已在 .gitignore） | `TOEIC/TOEIC紅藍本/kb/README.md`（拆解、校對流程與格式） |
+| `private/TOEIC/TOEIC紅藍本/` | 紅藍本（Hackers 聽力／閱讀題庫大全）聽力音檔、`kb/` Markdown 知識庫與 `kb/img/` 題目照片／圖表（市售書，**不可上傳**，已在 .gitignore） | `private/TOEIC/TOEIC紅藍本/kb/README.md`（拆解、校對流程與格式） |
 | `tools/redblue_kb.py` | 紅藍本知識庫工具：掃描 PDF、產生 OCR 原稿與目錄／音檔對照、轉圖、檢查校對稿 | 同上；Claude Code 可用 `/redblue-kb` |
-| `tools/build_listening_quiz.py` | 從 `TOEIC/TOEIC紅藍本/kb/L/*.md` 產生 `private/toeic_listening.json`（72 個題組、1,244 題） | 改完 `kb/L/` 後執行，再跑 `update_manifest.py` 與 `encrypt_ai.py` |
-| `tools/build_reading_mock.py` | 從 `TOEIC/TOEIC紅藍本/kb/R/R_AT*.md`（只收 status: done）產生 `private/toeic_reading_mock.json`（閱讀模擬考第一回、第二回，各 100 題） | 改完 `kb/R/R_AT*.md` 後執行，再跑 `update_manifest.py`，請使用者執行 `encrypt_ai.py` |
-| `tools/listening_ts.py` | 用語音辨識（faster-whisper）找出聽力音檔每題／每個題組的開始秒數 → `TOEIC/TOEIC紅藍本/kb/audio_ts.json`（不要手改；修正寫在 `kb/audio_ts_fix.json`） | 工具開頭說明；需先有 `private/toeic_listening.json` |
+| `tools/build_listening_quiz.py` | 從 `private/TOEIC/TOEIC紅藍本/kb/L/*.md` 產生 `private/toeic_listening.json`（72 個題組、1,244 題） | 改完 `kb/L/` 後執行，再跑 `update_manifest.py` 與 `encrypt_ai.py` |
+| `tools/build_reading_mock.py` | 從 `private/TOEIC/TOEIC紅藍本/kb/R/R_AT*.md`（只收 status: done）產生 `private/toeic_reading_mock.json`（閱讀模擬考第一回、第二回，各 100 題） | 改完 `kb/R/R_AT*.md` 後執行，再跑 `update_manifest.py`，請使用者執行 `encrypt_ai.py` |
+| `tools/listening_ts.py` | 用語音辨識（faster-whisper）找出聽力音檔每題／每個題組的開始秒數 → `private/TOEIC/TOEIC紅藍本/kb/audio_ts.json`（不要手改；修正寫在 `kb/audio_ts_fix.json`）。加 `--book toeic10` 改處理各 10 回音檔 → `private/toeic_md/listening/audio_ts.json`（修正寫在同資料夾 `audio_ts_fix.json`） | 工具開頭說明；紅藍本需先有 `private/toeic_listening.json`；需要 faster-whisper（`py -3.13 -m pip install faster-whisper`） |
 | `readme.md` | 程式架構、功能細節、出題原則 | |
 | `CHANGELOG.md` | 歷次修改紀錄 | 需要查歷史時才讀 |
-| `國營/`、`AI應用規劃師/`、`TOEIC/` | 出題來源 PDF／教材 | |
+| `參考書/AI應用規劃師/`、`參考書/國營/`、`參考書/TOEIC/` | 參考 PDF；紅藍本在 `參考書/TOEIC/紅藍本/`，各 10 回在 `參考書/TOEIC/聽力閱讀各 10 回/`；整棵不可上傳 | |
+| `private/toeic_md/`、`private/TOEIC/AI轉檔_md/` | 各 10 回既有轉檔成品（不搬）與轉檔 zip；不可混入紅藍本 | |
+| `參考書/TOEIC/聽力閱讀各 10 回/聽力/聽力模擬國際學村/` | 各 10 回聽力書（國際學村《最新！新制多益 TOEIC 聽力題庫解析》）的音檔 `TEST01.mp3`–`TEST10.mp3`，一回一檔、收錄 Part 1–4（原書標示 `TEST 01.mp3`…）；市售書，**不可上傳**（`參考書/` 已在 .gitignore）。只用於 `private/toeic_md/listening/testNN/` 的聽辨校對，不可與紅藍本音檔混用 | `private/toeic_md/PLAN.md` |
+| `tools/check_toeic10.py` | 各 10 回轉檔格式檢查（20 回：題號、選項、答案、簡答表、圖片連結、待核）：`py tools/check_toeic10.py [listening\|reading] [回次]`，只讀；各 AI 轉完一回要跑，結束碼 0 才算完成 | `private/toeic_md/PLAN.md` |
+| `tools/build_toeic10_reading.py` | 從 `private/toeic_md/reading/testNN/TESTNN.md`（status 為 done／reviewed）產生 `private/toeic10_reading.json`（閱讀 TEST 01–10，各 100 題，格式同閱讀模擬考 `mock:"reading"`）；標籤由解析開頭的題型對應。改完轉檔後執行，再跑 `update_manifest.py`，請使用者執行 `encrypt_ai.py` | `private/toeic_md/PLAN.md` |
+| `tools/build_toeic10_listening.py` | 從 `private/toeic_md/listening/testNN/TESTNN.md` 產生 `private/toeic10_listening.json`（聽力 TEST 01–10，各 100 題，格式同聽力模擬考 `mock:"listening"`，標籤 t_p1–t_p4）；同時從題本 PDF 裁 Part 1 照片與圖表、把音檔轉成 56 kbps，放在 `private/toeic_md/listening/media/`（不可上傳），並讀 `audio_ts.json` 加逐題片段。網頁媒體鍵是 `img/t10/…`、`audio/t10/…`。執行後請使用者執行 `encrypt_ai.py`，再跑 `update_manifest.py` | 工具開頭說明 |
+| `tools/toeic10_asr.py` | 各 10 回聽力音檔語音辨識：`py tools/toeic10_asr.py 1 2` → `private/toeic_md/listening/testNN/asr.json`／`asr.txt`（逐段秒數＋英文），供找題目秒數與比對原文 | 工具開頭說明 |
 
 ## 絕對不能違反的規則
 
@@ -46,7 +52,7 @@
    - 不可插入、刪除、調換題目順序，不可刪除或改名題組 `id`。
    - 修改既有題目時，不改正解位置 `a`，也不調換選項順序（網頁不打亂選項，紀錄存的是選項索引）。
    - 真的必須搬動時，要在 index.html 的遷移表（`EXAM_MIGRATE`、`QUESTION_MIGRATE`、`OPTION_REMAP`）加對應，並先問使用者。
-2. **著作權**：AI 題庫明文只放 `private/`，網站只放加密檔。不要把 private/ 的內容複製到 data/、readme 或其他會上傳的地方。紅藍本知識庫（`TOEIC/TOEIC紅藍本/kb/`）同理，之後做成 quiz 也要走 private/＋加密。
+2. **著作權**：AI 題庫明文只放 `private/`，網站只放加密檔。不要把 private/ 的內容複製到 data/、readme 或其他會上傳的地方。紅藍本知識庫（`private/TOEIC/TOEIC紅藍本/kb/`）同理，之後做成 quiz 也要走 private/＋加密。
 3. **對外／站長模式**：對外只顯示 TOEIC；統計學、巨量資料的 JSON 雖然是公開明文，介面只有站長解鎖後才顯示。不要讓非 TOEIC 內容出現在對外畫面。
 4. 不要自己 push、不要執行 `encrypt_ai.py`（需要使用者的密碼）；改完 private/ 的 AI 題庫後，請使用者自己執行。
 
@@ -78,4 +84,4 @@ py tools/update_manifest.py
 
 ## 尚未決定的事
 
-- `TOEIC/TOEIC_Vocabulary_Day1-30.md` 是市售單字書整理（著作權內容），還沒加進 .gitignore；推上 GitHub 前要請使用者決定。
+- `private/TOEIC_Vocabulary_Day1-30.md` 是市售單字書整理（著作權內容），已在 private/，受 .gitignore 保護，不可上傳。

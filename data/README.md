@@ -8,7 +8,7 @@
 | toeic_p5_mock.json | Part 5 綜合模擬、早期專項特訓 |
 | toeic_p5_s1.json ／ s2 ／ s3 | Part 5 第一～三階段 |
 | toeic_p5_adv.json | Part 5 進階考點 |
-| toeic_p5_words.json | Part 5 單字題 Day 1–30（stage 7；依 TOEIC/TOEIC_Vocabulary_Day1-30.md 出題，每天 60 題，共 1800 題；片語只挖一個字）。新增或修改請用 `py tools/p5_words.py`，出題原則見專案根目錄 readme.md |
+| toeic_p5_words.json | Part 5 單字題 Day 1–30（stage 7；依 private/TOEIC_Vocabulary_Day1-30.md 出題，每天 60 題，共 1800 題；片語只挖一個字）。新增或修改請用 `py tools/p5_words.py`，出題原則見專案根目錄 readme.md |
 | toeic_p6.json | Part 6 |
 | toeic_part7.json | Part 7 |
 | stat_past.json | 統計學 考古題 |

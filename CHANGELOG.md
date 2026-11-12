@@ -2,6 +2,174 @@
 
 新的寫在最上面。規則與架構說明請看 [AGENTS.md](AGENTS.md) 和 [readme.md](readme.md)，這裡只記「哪一天改了什麼」。
 
+## 2026-11-12　各 10 回聽力加入逐題播放片段（已加密上線）
+
+- `py tools/listening_ts.py --book toeic10` 已產生 `private/toeic_md/listening/audio_ts.json`：TEST01–10 每回 Part 1／2 共 31 題、Part 3／4 共 23 個題組的開始秒數。只有 TEST01 Q87、TEST04 Q33 沒聽到「Number N」，兩題都在題組內，不影響片段。沒有推估值，也沒有 `audio_ts_fix.json`。
+- 重跑 `tools/build_toeic10_listening.py`：`private/toeic10_listening.json` 10 回的 Part 1／2 每題（310 題）與每個題組（230 組）都加上片段 `t`；與重跑前比對，除了 `t` 以外沒有任何欄位改變，update_manifest 逐題檢查通過。各回最後一個 Part 3 題組片段約 116 秒，因為包含 Part 4 作答說明（與紅藍本切法相同）。
+- 使用者已執行 `encrypt_ai.py` 更新 `data/toeic10_listening.enc.json`；`update_manifest.py` 檢查通過並更新 `tools/baseline.json`。題數變化 0（全站 12,032 題）。
+
+## 2026-11-12　新增 TOEIC 各 10 回閱讀 TEST 01–10（已加密上線）
+
+- 新增 `toeic10_reading`：TOEIC 閱讀 TEST 01–10，10 份題組（t10r_01–t10r_10）、共 1,000 題，加密為 `data/toeic10_reading.enc.json`，manifest 已新增該項（`enc:1`），`update_manifest.py` 檢查通過並更新 `tools/baseline.json`。
+- 題數 +1,000：全站 10,032 → 11,032 題。
+
+## 2026-11-12　完成閱讀 TEST 10（Q101–Q200）Markdown 轉檔與審核
+
+- 依 `private/toeic_md/reading/test09/` 的格式與流程，將閱讀 TEST 10（Q101–Q200，題本 PDF 277–306、簡答表 PDF 310 右欄；解答本 `-Part 2.pdf` PDF 211–261）完整轉錄至 `private/toeic_md/reading/test10/`（含 `TEST10.md`、`REVIEW.md`、`SOURCE_PAGE_MAP.md`、`DELIVERY_NOTE.md`、`checkpoint.json`、82 張原頁圖 `assets/`、164 張半頁放大圖 `review_crops/` 及 `logs/`）。
+- 全回驗證通過（100 題連續、答案與 PDF 310 右欄簡答表完全一致、373 個連結 0 斷鏈、待核 0 項、原書疑義編者註 4 則；難易度分布：低 13、中 59、高 24、難 4）。完成 R1 分段唯讀審核（`R1_1`–`R1_7`）、`fix01` 修正（Q152 解析 1 處用字修正）與 R2 唯讀覆核，狀態更新為 `reviewed`。
+- 產出打包檔 `toeic_md_reading_test10_{full,use,use_evidence}.zip` 與 `toeic_md_reading_test10.sha256` 並存放於 `private/TOEIC/AI轉檔_md/`，更新 `private/toeic_md/PLAN.md` 現況表。網站程式與題庫未改動，題數變化 0。
+
+## 2026-11-12　各 10 回閱讀轉成網站題庫（待加密）
+
+- 新增 `tools/build_toeic10_reading.py`：把 private/toeic_md/reading/test01–test10 的 Markdown 轉成 `private/toeic10_reading.json`（10 份閱讀模擬考 t10r_01–t10r_10，每份 100 題、19 篇文章，共 1,000 題；沿用閱讀整份模擬考的格式與畫面，限時 75 分鐘、交卷後檢討）。產生時自動用 update_manifest 的逐題檢查驗證欄位與標籤。
+- 標籤：這套書沒有「考點」欄，改由每題解析開頭的題型（〔…〕或第一句，如「推論 細節資訊」）對應 data/tags.json 既有標籤（Part 5 → t_p5*、Part 6 → t_p6*、Part 7 → t_p7*），並存成 kp。
+- 驗證：1,000 題答案與各回簡答表全部一致；抽樣 60 題選項逐字比對無差異；Part 6 空格數與題數相符；多篇文章與翻譯、詞彙分篇對得上；已用不含加密的預覽副本實際操作（開始作答、交卷、檢討、全文翻譯、表格、三篇式文章）。
+- 修正轉換時發現的問題：部分回次文章沒有 `> ` 引用格式、編者註夾在兩篇文章之間會截斷後面的文章、`&lt;` 等 HTML 實體、多篇文章的詞彙分行。2 條原書看不清的【待核】詞彙（exclusively、reimburse）整條不收。
+- `tools/encrypt_ai.py` 的 SOURCES 加入 toeic10_reading.json（執行後會自動在 manifest 新增一行）；index.html 閱讀模擬考鎖定提示改為「輸入密碼解鎖閱讀模擬考」（原文寫「第一回、第二回」）。**尚未加密、尚未進入 manifest**，網站目前看不到這 10 回；題數變化待加密後為 +1,000。
+
+## 2026-11-12　各 10 回 20 份轉檔解開並建立格式檢查
+
+- 閱讀 TEST 10 已由 Gemini 轉完（reviewed）。把 private/TOEIC/AI轉檔_md/ 裡尚未解開的 15 份 `_use.zip`（聽力 TEST 03–10、閱讀 TEST 01–07）解開到 private/toeic_md/listening/testNN、reading/testNN；zip 原檔保留。至此聽力 10 回、閱讀 10 回都在 toeic_md/ 底下，每回 100 題。
+- 新增 `tools/check_toeic10.py`（只讀）：檢查 frontmatter status、題號連續、每題來源／答案／翻譯／解析、選項數（聽力 Part 2 為 3 個）、答案與簡答表比對、圖片連結、【待核】。結果：20 回全部通過，只剩 2 處【待核】（閱讀 TEST 02 Q153–155 `exclusively`、閱讀 TEST 04 Q196–200 `reimburse`）。警告：只有聽力 TEST 01 有「考點」，聽力 TEST 01–03 沒有「難易度」，聽力 TEST 01 沒有簡答表檔。
+- AGENTS.md 檔案地圖加入此工具；PLAN.md 的回次現況表改為最新。網站題庫未改動，題數變化 0。
+
+## 2026-11-12　單字提示詞典優化（第二批：出現 10–49 次的 1,471 字）
+
+- 逐字讀完這 1,471 個單字的釋義，改寫 167 個：釋義明顯錯誤的（efficiently 原本是「生效；能勝任」、mall「林蔭路」、logo「連合活字」、gym 前面有亂碼、locker「抽屜；上鎖人」）、混進無關義項的（natural「白痴」、portal「肝門」、re「不動產」、truck、peak、toward、unlike、private、law、keynote）、TOEIC 常用義排在後面的（shuttle 接駁車、post 職位、resume 履歷表、foundation 基金會、coupon 優惠券、tablet 平板電腦、portfolio、pickup、outlet、hub），並補上城市（Boston、Chicago、Denver、Singapore）與 比較級／最高級（easier、smaller、largest）的說明。
+- 人名 33 個改成「（姓氏）…／（男子名）…／（女子名）…」：原本是「(Halvorsen)人名；(英、西…)」之類的原文或不相干的字（nair「一種檢驗法」、hart「雄鹿」、lee「背風處」）。
+- 單字 11,646、變化形 3,864、片語 3,460（皆不變）。題庫與網站程式未改動，題數變化 0。
+
+## 2026-11-12　單字提示詞典優化（第一批：高頻字與整體整理）
+
+- 使用者回報單字卡的 expedited 存成品牌名 expedit：原因是 ECDICT 的詞形還原把 -ed／-ing 形的字尾切錯。`tools/glossary_extra.json` 新增 `f`（變化形→原形覆寫，null＝取消對應），修正 expedited→expedite、postponing→postpone、routing→route、zoned→zone、lenses→lens、refilling→refill、thrilled／thrilling→thrill，並取消 evening→even、james→jame 等 19 個誤對應（人名被切成不存在的字）。
+- `tools/make_glossary.py` 新增 `normalize()`：去掉 `\r`、有詞性的行存在時丟掉無詞性的雜訊行（DOS／電腦指令釋義，如 share、copy、sort、find、aim 後面多出來的那一行）、vt./vi. 併成 v.、a. 改 adj.、同詞性的行合併。新增 `--patch`：沒有 ecdict.csv 也能把 glossary_extra.json 與整理規則套到現有的 data/glossary/toeic.json。
+- 人工改寫 158 個 w 釋義：高頻功能字與常用字（the、a、are、will、can、in、last、still、find、share、copy、online…）、a.m./p.m. 被拆開的 a／m／p、字母與網域縮寫（ms、mr、com、org、www…）、全部 apostrophe 縮寫（I'm、don't、we'll…）、expedite／vacate／reimbursement／progressive 等，以及被誤判的人名。
+- 單字 11,646（+2）、變化形 3,864、片語 3,460（不變）；6,831 個單字釋義經整理規則調整格式。題庫與網站程式未改動，題數變化 0。
+
+## 2026-11-12　整理 private/ 資料夾
+
+- 各 10 回聽力音檔已在 `參考書/TOEIC/聽力閱讀各 10 回/聽力/聽力模擬國際學村/`（舊 `TOEIC/` 已不存在）：修正 `tools/toeic10_asr.py` 的讀取路徑，以及 AGENTS.md、readme.md、.gitignore 註解、private/toeic_md/PLAN.md 的記載。
+- 閱讀 TEST 09 的三個 zip 與 .sha256 從 private/toeic_md/ 移到 private/TOEIC/AI轉檔_md/（sha256 驗證通過），所有轉檔 zip 集中一處。
+- 與參考書逐位元相同的 private/toeic_md/_sources/（兩份 PDF），以及與 listening/test02 相同的 _template/test02，移到 private/_待刪/，由使用者確認後自行刪除。內容已解開的 toeic_md_handoff.zip.part00–04（約 437 MB）也移到 private/_待刪/handoff_zip/。
+- PLAN.md 補上全部回次現況表。網站題庫未改動，題數變化 0。
+
+## 2026-11-12　登記各 10 回聽力音檔位置
+
+- 使用者新增 `TOEIC/聽力/聽力模擬國際學村/TEST01.mp3`–`TEST10.mp3`（約 423 MB），是各 10 回聽力書的音檔；在 AGENTS.md 檔案地圖、readme.md 目錄、private/toeic_md/PLAN.md 與 .gitignore 註解登記位置與「不可上傳」。
+- 確認 `TOEIC/` 仍被 .gitignore 排除。網站題庫未改動，題數變化 0。
+- 新增 `tools/toeic10_asr.py`（faster-whisper small），對 TEST01、TEST02 做語音辨識，輸出到 private/toeic_md/listening/testNN/asr.json、asr.txt；與原文逐句比對尚未進行。
+
+## 2026-11-09　完成聽力第二回 100 題 Markdown／原圖整理
+
+- 在 private/toeic_md/listening/test02/ 保存第二回題本與解答本共 56 頁原稿及原圖；整理 Q1–Q100 原文、中譯、解析、詞彙、口音、六張照片、23 組共用對話／獨白及五份圖表，補齊作答說明與自我檢視。
+- 以題本總答案表交叉比對，100 題正解全部一致；檢查題號連續、375 個英文選項、來源連結與題組輪次。英文文字層比對後回查原圖並補正兩處漏字，另註記原書一處題號誤植。
+- 建立驗收紀錄及 34 頁詞彙／音標原圖附錄；完成狀態指 Markdown／原圖整理，仍未找到對應音檔，未做聽辨。
+- 未更動第一回及網站程式或題庫 JSON，未加密、未 push；網站題數變化 0。
+
+## 2026-11-08　聽力第一回整回驗證與修正
+
+- 以題本 PDF 149 正確答案表做第二來源比對，Q1–Q100 答案全部一致；英文題目、選項及 Part 3–4 原文以文字層比對後，可疑處再放大原圖確認。
+- 修正 Part 3 口音 4 組（Q47–49、Q56–58、Q62–64、Q68–70：原書「美式」誤寫成「英式」）、Q96 題目漏字 that、Q77–79 原文（That is when we will…client yet.）、Q83–85 原文（use the phone，多寫 new）。網站題庫未改動，題數變化 0。
+
+## 2026-11-08　完成聽力第一回 100 題 Markdown／原圖整理
+
+- 私有校對稿新增 Q53–Q100（48 題），完成 Part 3 共 13 組對話、Part 4 共 10 組獨白，逐頁對照題本及解答本原圖；補齊五份圖表、Part 1 逐項解析、總說明、四部分 Directions、例題與自我檢視頁。
+- 建立私有驗收紀錄及 34 頁詞彙／音標原圖附錄；音標保留原字形，未逐字重排。第一回標記 done，範圍是 Markdown／原圖整理；仍未找到對應音檔，未做聲音校對。
+- 檢查 Q1–Q100 連續、375 個英文選項、單一正解、23 組共用原文及來源連結。原有 Q1–Q52 的英文、選項與答案保留；另註記原書型錄價格差異，不改題目正解。
+- 未更動網站程式或題庫 JSON，未加密、未 push；網站題數變化 0。
+
+## 2026-11-08　聽力第一回 Part 3 接續校對至 Q52
+
+- 私有 Markdown 校對稿新增 Q41–Q52（四組、12 題），逐頁對照題本 PDF 12–13 與解答本 PDF 36–39 原圖，整理共用對話、說話者、中譯、題目選項、答案、解析、重點詞彙及換句話說；口音另放大原圖核對，音標未轉錄，音檔尚未核實。
+- 檢查新增題號連續、每題四選項與正解、四組對話輪次及來源圖片；既有 Q1–Q40 內容完整保留。第一回仍為 partial，下一組由 Q53–Q55 接續。
+- 只更新私有校對稿、分批計畫與修改紀錄；網站題庫未改動，題數變化 0。
+
+## 2026-11-08　聽力第一回 Part 3 前三組對話校對
+
+- 私有 Markdown 校對稿接續完成 Q32–Q40（三組、9 題），逐頁對照題本 PDF 12 與解答本 PDF 33–35 原圖，整理共用對話、說話者、中譯、題目選項、答案、解析、重點詞彙及口音；音標未轉錄，音檔尚未核實。
+- 檢查新增題號連續、每題四選項與正解、三組對話輪次及來源圖片；既有 Q1–Q31 內容完整保留。第一回仍為 partial，下一組由 Q41–Q43 接續。
+- 只更新私有校對稿、分批計畫與修改紀錄；網站題庫未改動，題數變化 0。
+
+## 2026-11-08　聽力第一回 Part 1–2 校對驗證與修正
+
+- 以放大的解答本原圖（PDF 22–32）複核私有校對稿 Q1–Q31：英文、選項、答案與解析正誤標記均正確。
+- 修正 Part 2 口音標示 13 題（Q9、12、13、14、16、18、21、23、24、25、27、28、30；多為原書「美式」誤寫成「英式」，Q25 為「加拿大式 → 澳洲式」）。
+- 中譯與詞彙改回原書用字 17 處（Q1、5、7、8、9、10、11、12、13、14、15、17、18、21、28）。網站題庫未改動，題數變化 0。
+
+## 2026-11-08　聽力第一回 Part 2 翻譯與解析校對
+
+- 在私有 Markdown 校對稿補齊 Q7–Q31 的問句與選項中譯、逐項解析、重點詞彙、考點及口音，逐頁對照解答本 PDF 24–32 原圖；音標未轉錄。
+- 註記 Q19 (B) 原書中譯與英文時態不一致；既有英文、選項順序及答案均保留。第一回仍為 partial，下一批從 Part 3 Q32–Q34 接續。
+- 檢查 25 題題號連續、欄位完整、各題解析正誤標記與答案一致、來源圖存在，並比對既有英文與答案未變。網站題庫未改動，題數變化 0。
+
+## 2026-11-06　校正聽力第一回 Part 2
+
+- 依解答本原圖逐題校正 Q7–Q31 英文問句、選項與答案；翻譯、解析及 Part 3–4 繼續標示待校對。網站題數變化 0。
+
+## 2026-11-06　聽力第一回 Markdown 草稿與分批計畫
+
+- 在 private/toeic_md/ 建立閱讀／聽力 PDF 分批處理計畫與來源書籤索引，先處理聽力 TEST 01。
+- 保存第一回題本 PDF 6–19、解答本 PDF 21–62 的完整 56 頁 OCR 草稿及原頁圖，供逐頁校對；明文全部留在 private/。
+- 整理 Part 1 Q1–Q6 的原文、選項、答案、照片描述、翻譯、解析摘要與詞彙，已對照原圖；Part 2–4 尚未校對，第一回整體標記 partial。
+- 網站題庫未改動，題數變化 0；未執行加密或 push。
+
+## 2026-11-06　電子書 PDF 正式命名與章節書籤
+
+- 私有電子書四份 PDF 依封面改為「最新！新制多益 TOEIC 閱讀／聽力題庫解析」，以題本、解答本區分。
+- 加入目錄、各回 TEST、各 Part 及附錄的分層書籤，並依實際 PDF 頁面校正跳轉位置；原始 PDF 留存於私有備份資料夾。
+- 保留原有頁面與 OCR 內容；題庫題數無變化。
+
+## 2026-11-06　閱讀題本／詳解合併成 PDF
+
+- `tools/ebook_to_pdf.py` 新增 `--pages`（依截圖編號選頁）。
+- 閱讀截圖（`private/ebook_captures/20261105-230927-476048/`，919 張）分成 `private/ebook_captures/閱讀/閱讀題本（OCR用）.pdf`（截圖 1–322，322 頁）與 `閱讀詳解（OCR用）.pdf`（截圖 323–919，596 頁），同樣放大 3 倍、300 DPI。
+- 以 OCR 讀每頁印刷頁碼核對：題本、詳解都沒有漏頁或重複。截圖 641 是載入失敗的灰色畫面，已排除；截圖 14、15 多截到閱讀器書籤，PDF 裡已裁掉。原始截圖未改動。
+
+## 2026-11-06　截圖合併成 OCR 用 PDF
+
+- 新增 `tools/ebook_to_pdf.py`：電子書截圖每頁放大 3 倍（Lanczos）、以 300 DPI 實際尺寸合併成 PDF，提升 OCR 辨識率。原本的合併檔是 690×970 像素、標示 72 DPI，中文字約 11 像素高；用 Windows 內建 OCR 實測，放大後英文黏字與中文形近錯字明顯減少。
+- 已產生 `private/ebook_captures/聽力/聽力題本（OCR用）.pdf`（164 頁）與 `聽力解答（OCR用）.pdf`（490 頁），原本的 PDF 保留未動。更新 `tools/capture_ebook.md`；題數無變化。
+
+## 2026-11-05　背景截圖：截圖大小、接續追加、翻頁備援
+
+- `tools/capture_ebook_background.py`：
+  - 截圖大小可調：裁掉閱讀器底色只留書頁（預設開）、清晰度倍率 1～4（CDP 設定像素密度）、輸出寬度等比例縮放；選單輸入 `s` 修改，或用 `--scale`、`--width`、`--no-trim`。
+  - 截完不關閉：選單可再輸入張數從下一頁接著截（編號接續、不重複存同一頁）、改設定或 `q` 結束；截圖中按 Enter 存完目前這張就停。翻頁失敗或閱讀器提示也回到選單，不結束程式。
+  - 「選 2 張只存 1 張」：第 2 張卡在翻頁。現在依序嘗試翻頁按鈕 → 按鈕事件 → 右方向鍵，以畫面是否改變判斷；另加 Chrome 參數避免視窗被蓋住時停止繪製、頁面維持焦點。實際原因需在博客來書頁確認，紀錄寫在輸出資料夾的 `log.txt`。
+  - 改用 CDP `Page.captureScreenshot` 截圖（Playwright 連線模式的截圖會縮回 CSS 像素，倍率無效）；隱藏工具列改用 element.style，不受網站 CSP 影響。
+- `capture_ebook_background.cmd` 缺少時一併安裝 Pillow。更新 `tools/capture_ebook.md`；題數無變化。
+- 已用模擬閱讀器驗證上述流程；博客來實際書頁待使用者試截。
+
+## 2026-11-05　修正背景截圖無法登入博客來
+
+- 原因：由 Playwright 啟動的 Chrome 帶 `--enable-automation`，`navigator.webdriver` 為 true，博客來（及 FB／Google 登入）會擋自動化瀏覽器；無介面模式則直接顯示「您的連線暫時異常」。
+- `tools/capture_ebook_background.py` 改成自己用一般方式啟動 Chrome（獨立暫存設定檔＋本機除錯埠），登入、開書、按 Enter 之後才用 Playwright `connect_over_cdp` 連線截圖。已確認此方式 `navigator.webdriver` 為 false、登入頁正常顯示。
+- 結束時關閉整個 Chrome 程序樹並刪除暫存設定檔（已驗證不留檔）；等待 Enter 時關閉 Chrome 會立即停止；修正結束時的 stdin 鎖錯誤訊息。
+- 實際登入與書頁截圖仍待使用者試用確認。更新 `tools/capture_ebook.md`；題數無變化。
+
+## 2026-11-05　調整背景截圖的登入流程
+
+- `tools/capture_ebook_background.py`：由全新無痕 context 改成一般 Chrome 的獨立暫存設定檔，取消固定 1280×960／2 倍像素，改用實際視窗大小；先開博客來首頁，讓使用者登入後從書櫃開書。關閉工具後清除該次設定檔。
+- 等待終端機 Enter 改成獨立讀取執行緒，主執行緒持續處理 Playwright 事件。已用本機模擬頁驗證等待期間的彈窗載入、事件回傳與暫存設定檔清除；未能重現使用者的 FB 空白問題，尚未確認 FB 實際登入是否恢復。
+- 更新 `tools/capture_ebook.md`；題數無變化。
+
+## 2026-11-05　博客來電子書背景截圖
+
+- 新增 `tools/capture_ebook_background.py` 與 `.cmd` 啟動入口：獨立 Chrome 登入、設定張數與等待秒數，直接控制閱讀器翻頁並截取書頁區域，可讓其他應用程式覆蓋閱讀器視窗；不需 F8 框選、不送出桌面按鍵、不含 OCR。Ctrl+C 可停止，重複畫面或登入提示會中止。
+- 圖片與工具專用 Playwright 套件放在 `private/`；不複製原本 Chrome 的登入資料，工具關閉後不保留該次登入。更新 `tools/capture_ebook.md`，保留原本前景版用法。
+- 已用無介面 Chrome 模擬閱讀器驗證背景分頁 3 張不同 PNG、2 倍像素、最後一張不多翻、其他分頁未變更、截圖樣式恢復、重複畫面停止及登入提示阻擋。博客來實際書頁待使用者登入後試截；最小化狀態尚未驗證。
+- 題數無變化。
+
+## 2026-11-05　電子書右方向鍵截圖工具
+
+- 新增 `tools/capture_ebook.ps1`：Windows 內建 PowerShell 工具，可設定截圖張數與翻頁等待秒數，用 F8 選取範圍，截取目前頁後按鍵盤右方向鍵翻頁；F10 或切換視窗即停止。圖片存入 `private/ebook_captures/` 的獨立批次資料夾，不含 OCR。
+- 新增 `tools/capture_ebook.md` 操作說明。已通過 Windows PowerShell 5.1 語法、Win32 載入與 PNG 編碼檢查；博客來閱讀器實際翻頁與截圖待試截確認。
+- 題數無變化。
+
+## 2026-11-05　隨機抽考不再每次抽到同一批錯題
+
+- `index.html`：原本「錯題複習」名額（聽力 2 個題組／單題、Part 5 依比例 3 題）只看試卷紀錄 `st.ans`，而抽考作答不寫進 `st.ans`，所以同一批錯題每回都會出現（聽力 10 題裡常有 6 題固定）。改看刷題紀錄 `st.tlog`（`drawInfo`）：錯題複習只出「之後還沒答對過、且 3 天內沒做過」的題；其餘先出沒做過的題，3 天內（試卷或抽考）做過的排到最後。範圍選錯題／標註等時也一樣把最近做過的排後面。題數無變化。
+
 ## 2026-11-05　未登入時閱讀模擬考的顯示
 
 - `index.html`：未解鎖時，目錄「模擬考 → 閱讀」與隨機抽考的「閱讀整份模擬考」原本顯示「待新增」，改成和聽力模擬考一樣顯示「已加密／需密碼解鎖」，點選可前往輸入密碼。題數無變化。
@@ -331,3 +499,4 @@
 - 新增作答計時（st.tlog，保留 180 天）、刷題統計頁與依科目分類的進步曲線。
 - 當時版本：index.html 06093ac6…（86,606 bytes）；stat_past.json 0f1bf610…；manifest 3c3d398c…。
 - 當時的寫回流程（Claude 雲端工作環境）：SendUserFile 取得 file_uuid → device_commit_files（fileUuid＋expectedMtimeMs）→ 重新 stage 比對 md5。
+
