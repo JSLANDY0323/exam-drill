@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <script>try{var __t=localStorage.getItem("quiz-theme");if(__t==="light"||__t==="dark")document.documentElement.setAttribute("data-theme",__t)}catch(e){}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>刷題小工具</title>
+<title>刷就對了</title>
 <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0F0F0F" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="刷題目錄">
+<meta name="apple-mobile-web-app-title" content="首頁">
 <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -1319,8 +1319,8 @@ function toeicItems(){
      `<li>${folder("p3","Part 3　簡短對話",groupMeta(p3all),p3all.map(examLeaf).join(""))}</li>`+
      `<li>${folder("p4","Part 4　簡短獨白",groupMeta(p4all),p4all.map(examLeaf).join(""))}</li>`
     :lockRow("輸入密碼解鎖聽力題庫（Part 1–4）");
-  const mockL=lMock.length?lMock.map(examLeaf).join(""):lockRow("輸入密碼解鎖聽力模擬考（第一回、第二回）");
-  const mockR=rMock.length?rMock.map(examLeaf).join(""):lockRow("輸入密碼解鎖閱讀模擬考（第一回、第二回）");
+  const mockL=lMock.length?lMock.map(examLeaf).join(""):lockRow("輸入密碼解鎖聽力模擬考");
+  const mockR=rMock.length?rMock.map(examLeaf).join(""):lockRow("輸入密碼解鎖閱讀模擬考");
   const mock=`<li>${folder("mock_l","聽力",lMock.length?groupMeta(lMock):"已加密",mockL)}</li>`+
       `<li>${folder("mock_r","閱讀",rMock.length?groupMeta(rMock):"已加密",mockR)}</li>`;
   return `<li>${folder("t_listen","聽力",lAll.length?groupMeta(lAll):"已加密",listening)}</li>`+
@@ -1541,8 +1541,10 @@ function lClipSrc(ex,q){  // {id 片段代表題（題組第一題）, mkey, raw
   const alt=!!(lAccAlt&&o.tA&&pa.audioAlt),r=alt?o.tA:o.t,rel=alt?pa.audioAlt:pa.audio;
   if(!r||!rel)return null;
   const i0=S?ex.qs.findIndex(x=>x.s===q.s):ex.qs.indexOf(q);
-  return {id:ex.id+"-"+i0,mkey:"audio/"+rel,raw:"TOEIC/TOEIC紅藍本/聽力/"+rel,r};
+  return {id:ex.id+"-"+i0,mkey:"audio/"+rel,raw:lRaw("audio",rel),r};
 }
+// 未加密時（本機預覽）媒體的原始位置：t10/ 開頭是各 10 回聽力（build_toeic10_listening.py 產生），其餘是紅藍本
+const lRaw=(k,rel)=>rel.startsWith("t10/")?"private/toeic_md/listening/media/"+rel.slice(4):(k==="img"?"private/TOEIC/TOEIC紅藍本/kb/img/":"private/TOEIC/TOEIC紅藍本/聽力/")+rel;
 const lHasAlt=(ex,q)=>{const S=q.s!==undefined&&ex.sets?ex.sets[q.s]:null,pa=ex.partAudios?ex.partAudios[q.part]||{}:ex;return !!((S||q).tA&&pa.audioAlt)};
 // 片段要能任意跳秒，一律轉成 blob（本機 http.server 不支援 Range，直接用路徑會跳不過去）
 async function lClipUrl(mkey,raw){
@@ -1660,7 +1662,7 @@ function lScriptHTML(S){
   </div>`;
 }
 function lImgHTML(file,alt,cls){
-  const ik="img/"+file,ir="TOEIC/TOEIC紅藍本/kb/img/"+file,isrc=mediaSync(ik,ir);
+  const ik="img/"+file,ir=lRaw("img",file),isrc=mediaSync(ik,ir);
   return `<div class="${cls}"><img ${isrc?`src="${isrc}" data-resolved="${esc(ik)}"`:""} data-mkey="${esc(ik)}" data-raw="${esc(ir)}" alt="${esc(alt)}" loading="lazy"></div>`;
 }
 // 抽考裡和這題同一個聽力題組的題目（同一頁顯示）；題組的作答先暫存在 st.pr.dr，整組選完才一起批改
@@ -1753,7 +1755,11 @@ async function resolveMedia(mkey,mime,rawPath){
         }
       }catch(e){}
     }
-    const u=encodeURI(rawPath);ENC_MEDIA.set(mkey,u);return u;
+    // 原檔僅限本機預覽；公開部署不回退到 private/。
+    const localPreview=["localhost","127.0.0.1","[::1]"].includes(location.hostname)
+      && ["http:","https:"].includes(location.protocol);
+    if(localPreview&&rawPath){const u=encodeURI(rawPath);ENC_MEDIA.set(mkey,u);return u}
+    throw new Error("加密媒體未解鎖或無法載入");
   })().finally(()=>ENC_PENDING.delete(mkey));
   ENC_PENDING.set(mkey,p);
   return p;
@@ -1768,7 +1774,7 @@ function hydrateListeningMedia(){
       if(!el.isConnected||el.dataset.mkey!==mkey)return;
       el.src=u;el.dataset.resolved=mkey;
       if(el.tagName==="AUDIO"&&el.playbackRate!==lRate)try{el.playbackRate=lRate}catch(e){}
-    });
+    }).catch(()=>{el.dataset.resolved=""});
   });
 }
 // 整段播放交卷：auto＝音檔播完自動交卷（不詢問未作答；全都沒寫就只提示）
@@ -1823,7 +1829,7 @@ function vListening(){
     altRel=ex.partAudios[lPartTab].audioAlt||null;
   }
   const activeAud=(lAccAlt&&altRel)?altRel:audRel;
-  const audKey="audio/"+activeAud,audRaw="TOEIC/TOEIC紅藍本/聽力/"+activeAud,audSrc=mediaSync(audKey,audRaw);
+  const audKey="audio/"+activeAud,audRaw=lRaw("audio",activeAud),audSrc=mediaSync(audKey,audRaw);
   let doneCnt=0,okCnt=0;
   vis.forEach(i=>{const id=ex.id+"-"+i,a=st.ans[id];if(a!==undefined){doneCnt++;if(okAns(ex.qs[i],a))okCnt++}});
   const allDone=doneCnt===vis.length&&vis.length>0;
