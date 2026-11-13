@@ -183,6 +183,19 @@ body.readmode{overflow:hidden}
 .gltip[hidden]{display:none}
 .gltip .gt-k{opacity:.65;font-size:.78rem}
 .gltip .gt-sep{display:block;height:1px;margin:6px 0;background:currentColor;opacity:.25}
+/* 教學補充（詞典的 x：詞性、搭配、例句）：提示框用 .gx，單字卡背面用 .vc-x */
+.gx,.vc-x{display:block;white-space:normal}
+.gx>span,.vc-x>span{display:block}
+.gx .gx-zh,.vc-x .gx-zh{opacity:.75}
+.gx .gx-e,.vc-x .gx-e{margin-top:4px;font-style:italic}
+.vc-x{margin-top:4px;padding-top:8px;border-top:1px dashed var(--line);font-size:.84rem;line-height:1.6}
+.vc-x .gt-k{font-size:.74rem;color:var(--muted)}
+.vc-occ{margin:0 16px 8px;font-size:.82rem;line-height:1.6}
+.vc-occ ul{list-style:none;margin:4px 0 0;padding:0;max-height:168px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.vc-occ li{padding:4px 10px;border-top:1px solid var(--line)}
+.vc-occ li:first-child{border-top:0}
+.vc-occ .linkbtn{text-align:left}
+.vc-occ .oc-t{color:var(--muted);font-size:.76rem;margin-left:6px;white-space:nowrap}
 @media (max-width:860px){
   .wrap.readmode{padding:10px 12px 10px}
   .rhead h1{font-size:1.05rem;margin-bottom:6px}
@@ -514,6 +527,7 @@ const L="ABCD", KEY="bigdata-quiz-v2";
 
 const ALL = [];
 const QM = {};
+let OCC=null;const occHit=new Map();   // 單字卡「出現題目」反查的快取，見 occUnits／occFind
 function addData(d){
   if(!d||typeof d!=="object")return;
   if(d.tags)Object.assign(TAGS,d.tags);
@@ -525,6 +539,7 @@ function addData(d){
 function buildIndex(){
   ALL.length=0;ALL.push(...TOEIC_EXAMS,...STAT_PAST,...AI_JR,...AI_SR,...PAST,...EXAMS);
   Object.keys(QM).forEach(k=>delete QM[k]);
+  OCC=null;occHit.clear();   // 題庫變動（解鎖、重新載入）後，單字卡的「出現題目」反查要重掃
   ALL.forEach(ex=>ex.qs.forEach((q,i)=>{QM[ex.id+"-"+i]={ex,i,q}}));
 }
 /* ---------- AI應用規劃師題庫加密：輸入密碼後才在瀏覽器解密（PBKDF2-SHA256＋AES-256-GCM，加密見 tools/encrypt_ai.py） ---------- */
@@ -761,15 +776,43 @@ const glTip=document.createElement("div");glTip.className="gltip";glTip.hidden=t
 let glOn=[],glCur=null,glTm=0;
 function glHide(){clearTimeout(glTm);glTip.hidden=true;glOn.forEach(x=>x.classList.remove("on"));glOn=[];glCur=null}
 const glHideSoon=()=>{clearTimeout(glTm);glTm=setTimeout(glHide,280)};
+// 教學補充（詞典的 x，目前只有少數試做的字）：詞性與可數性、常見搭配、一句情境例句；by:"ai" 的標示「AI 生成」。整段不含換行（提示框是 pre-line）
+function glExtra(k,cls){const x=GL&&GL.x&&GL.x[k];if(!x)return "";
+  return `<span class="${cls}"><span class="gt-k">${esc(k)}　補充${x.by==="ai"?"（AI 生成）":""}${x.pos?"　"+esc(x.pos):""}</span>`+
+    (x.col||[]).map(([en,zh])=>`<span><b>${esc(en)}</b>　<span class="gx-zh">${esc(zh||"")}</span></span>`).join("")+
+    (x.ex&&x.ex[0]?`<span class="gx-e">${esc(x.ex[0])}</span>${x.ex[1]?`<span class="gx-zh">${esc(x.ex[1])}</span>`:""}`:"")+`</span>`}
+/* 反查「這個字／片語出現在哪些題目」：只在記憶體裡掃目前已載入（已解鎖）的 TOEIC 題庫，不另外發布索引。
+   文字範圍同 make_glossary.py 的 texts()：題幹（空格填回正解）＋選項、文章 head／text（{{n}} 填回正解）、聽力原文；文章與聽力原文記在該篇的第一題。
+   單字用存卡規則歸到同一個鍵（took → take，GL.k 的 challenging 留原字）；片語每個字可用原字或原形，不跨標點。 */
+function occUnits(){if(OCC)return OCC;OCC=[];
+  const add=(id,kind,text)=>{const runs=String(text||"").split(/[^A-Za-zÀ-ÿ'’\-\s]+/).map(p=>(p.match(GL_WORD)||[]).map(glNorm).filter(Boolean)).filter(r=>r.length);
+    if(runs.length)OCC.push({id,kind,runs})};
+  ALL.forEach(ex=>{if(exScope(ex)!=="toeic")return;
+    const fill=t=>String(t||"").replace(/\{\{(\d+)\}\}/g,(m,n)=>{const q=ex.qs.find(x=>x.n===+n);return q?q.o[q.a]:" "});
+    const first=(f,v)=>{const i=ex.qs.findIndex(q=>q[f]===v);return i<0?null:ex.id+"-"+i};
+    (ex.passages||[]).forEach((P,pi)=>{const id=first("p",pi);if(id)add(id,"文章",(P.docs&&P.docs.length?P.docs:[P]).map(d=>fill(d.head)+"\n"+fill(d.text)).join("\n"))});
+    (ex.sets||[]).forEach((S,si)=>{const id=first("s",si);if(id&&S.script)add(id,"聽力原文",S.script)});
+    ex.qs.forEach((q,i)=>{const o=Array.isArray(q.o)?q.o:[],ans=typeof o[q.a]==="string"?o[q.a]:"";
+      add(ex.id+"-"+i,"",[String(q.q||"").replace(/_{3,}/g,ans),...o.filter(t=>typeof t==="string")].join("\n"))})});
+  return OCC}
+function occFind(c){const ck=vKey(c.t,c.k);if(occHit.has(ck))return occHit.get(ck);
+  const ws=c.k.split(" "),key=t=>{const L=GL.f[t];return L&&GL.w[L]&&!GL.ks.has(t)?L:t},out=[];
+  occUnits().forEach(u=>{let n=0;
+    u.runs.forEach(r=>{if(c.t==="w")r.forEach(t=>{if(t===c.k||key(t)===c.k)n++});
+      else for(let i=0;i+ws.length<=r.length;i++)if(ws.every((w,j)=>r[i+j]===w||GL.f[r[i+j]]===w))n++});
+    if(n)out.push({id:u.id,kind:u.kind,n})});
+  occHit.set(ck,out);return out}
 function glShow(el){if(!GL)return;glHide();
   const gp=el.closest(".gp"),wc=glWordCard(el.dataset.w),pk=gp&&gp.dataset.p;
   let h=gp?`<b>${esc(pk)}</b><span class="gt-k">　片語</span>\n${esc(GL.p[pk]||"")}`:"";
   const wi=glWordInfo(el.dataset.w);if(wi)h+=(h?`<span class="gt-sep"></span>`:"")+wi;
   if(!h)return;
+  const xk=[wc&&wc.k,el.dataset.w].find(k=>k&&GL.x&&GL.x[k]);if(xk)h+=`<span class="gt-sep"></span>`+glExtra(xk,"gx");
   const btn=(t,k,label)=>{const has=!!st.vocab[vKey(t,k)];return `<button type="button" data-gsave="${t}" ${has?"disabled":""}>${has?`已存 ${esc(k)}`:label}</button>`};
   h+=`<span class="gt-acts">${pk?btn("p",pk,"＋ 存片語"):""}${wc?btn("w",wc.k,pk?`＋ 存 ${esc(wc.k)}`:"＋ 存單字"):""}</span>`;
   glCur={el,pk,wc};
   glOn=[el,gp].filter(Boolean);glOn.forEach(x=>x.classList.add("on"));
+  glTip.style.left=glTip.style.top="0";   // 先歸零再量寬高：留在上一次的位置時，靠右的提示框會被擠窄
   glTip.innerHTML=h;glTip.hidden=false;
   const r=el.getBoundingClientRect(),tw=glTip.offsetWidth,th=glTip.offsetHeight;
   let y=r.bottom+8;if(y+th>innerHeight-8)y=r.top-th-8;
@@ -919,7 +962,7 @@ function renderTopbar(){
   const [s,label]=syncLabel();
   topbar.innerHTML=`<div class="topbar-in">
     <div class="tb-left"><button class="menubtn tb-menu" data-act="side" aria-label="開啟選單" aria-controls="side" aria-expanded="${sideExpanded()}">${I.menu}</button>
-    <button class="brand" data-act="go" data-v="home">${isOwner()?"刷題目錄":"TOEIC 刷題"}</button></div>
+    <button class="brand" data-act="go" data-v="home">${isOwner()?"首頁":"TOEIC 刷題"}</button></div>
     <nav class="tb-nav" aria-label="工具">${TOOLS.map(([v,n])=>`<button class="${toolOn(v)?"on":""}" ${toolAttrs(v)}>${toolLabel(v,n)}</button>`).join("")}</nav>
     <div class="tb-right">
       <div class="themesw" role="group" aria-label="顯示主題">${[["light","淺色"],["dark","深色"],["system","系統"]].map(([v,t])=>`<button data-act="theme" data-v="${v}" class="${getTheme()===v?"on":""}" aria-pressed="${getTheme()===v}">${t}</button>`).join("")}</div>
@@ -1077,8 +1120,8 @@ const noteEdit=new Set();
 function noteBox(id){
   const t=st.notes[id]||"";
   if(t&&!noteEdit.has(id))return `<div class="notebox"><div class="note-head"><strong>我的筆記</strong><button class="linkbtn" data-act="noteEdit" data-id="${id}">編輯</button></div><div class="md" data-md="${id}"></div></div>`;
-  return `<div class="notebox"><div class="note-head"><strong>我的筆記</strong><span class="note">Markdown．LaTeX：$x^2$、$$\\sum x_i$$</span><button class="linkbtn" data-act="noteDone" data-id="${id}" ${t?"":"hidden"}>完成</button></div>
-    <textarea class="note-in" data-id="${id}" rows="3" placeholder="為什麼錯？漏看了哪個訊號？下次怎麼判斷？" spellcheck="false">${esc(t)}</textarea>
+  return `<div class="notebox"><div class="note-head"><strong>我的筆記</strong><span class="note">支援Markdown．LaTeX語法</span><button class="linkbtn" data-act="noteDone" data-id="${id}" ${t?"":"hidden"}>完成</button></div>
+    <textarea class="note-in" data-id="${id}" rows="3" placeholder="筆記" spellcheck="false">${esc(t)}</textarea>
     ${noteKeysHtml()}
     <div class="note-pv md" data-md="${id}" ${t?"":"hidden"}></div></div>`;
 }
@@ -2212,7 +2255,15 @@ function vNotes(){
 }
 
 /* ---------- 單字卡（存卡片在檢討畫面的單字提示框；資料見 vocabSet） ---------- */
-const vFlip=new Set(),vNoteEdit=new Set();
+const vFlip=new Set(),vNoteEdit=new Set(),vOcc=new Set();
+// 來源題目前答錯的卡片：來源題要查得到（沒有來源、題庫還沒解鎖的不算）而且作答紀錄是錯的；沒作答不算答錯，多重正解依 okAns
+const vSrcWrong=k=>{const s=st.vocab[k].src;return !!(s&&QM[s]&&isWrong(s))};
+// 這個字／片語出現在哪些題目（occFind）：來源題排最前面，標出目前答錯的題
+function vOccHTML(c){
+  if(!GL)return `<div class="vc-occ">${glState===3?"詞典載入失敗，重新整理頁面後再試。":"詞典載入中…"}</div>`;
+  const hits=occFind(c).slice().sort((a,b)=>(b.id===c.src)-(a.id===c.src)),qn=new Set(hits.map(x=>x.id)).size,tot=hits.reduce((s,x)=>s+x.n,0);
+  if(!hits.length)return `<div class="vc-occ">目前載入的 TOEIC 題庫裡沒有找到這個${c.t==="p"?"片語":"字"}。</div>`;
+  return `<div class="vc-occ">出現在 ${qn} 題${tot>qn?`，共 ${tot} 處`:""}（點題號前往）<ul>${hits.map(x=>`<li><button class="linkbtn" data-act="jump" data-id="${esc(x.id)}">${esc(qLabel(x.id))}</button><span class="oc-t">${[x.kind,x.n>1?"×"+x.n:"",x.id===c.src?"存卡來源":"",isWrong(x.id)?"答錯":""].filter(Boolean).join("．")}</span></li>`).join("")}</ul></div>`}
 // 例句裡標出這個字／片語（每個字比對字首，took、delivered 這類變化形也大多標得到）
 function vMark(ex,k){
   const re=new RegExp("\\b"+k.split(" ").map(w=>w.slice(0,Math.max(3,w.length-2)).replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"[A-Za-z'’]*").join("\\s+"),"i"),m=re.exec(ex);
@@ -2222,12 +2273,13 @@ function vCard(k){const c=st.vocab[k];if(!c)return "";const f=vFlip.has(k),d=vDo
     <button type="button" class="vc-face" data-act="vflip" data-k="${esc(k)}" aria-expanded="${f}">
       <span class="vc-top"><span class="vc-type">${c.t==="p"?"片語":"單字"}</span>${d?`<span class="vc-ok">今天已複習</span>`:""}</span>
       <span class="vc-word">${esc(c.k)}</span>
-      ${f?`<span class="vc-mean">${esc(vMean(c))}</span>${c.ex?`<span class="vc-ex">${vMark(c.ex,c.k)}</span>`:""}`:`<span class="vc-hint">點卡片看翻譯</span>`}
+      ${f?`<span class="vc-mean">${esc(vMean(c))}</span>${c.ex?`<span class="vc-ex">${vMark(c.ex,c.k)}</span>`:""}${c.t==="w"?glExtra(c.k,"vc-x"):""}`:`<span class="vc-hint">點卡片看翻譯</span>`}
     </button>
+    ${vOcc.has(k)?vOccHTML(c):""}
     ${c.note&&!ed?`<div class="vc-note">${esc(c.note)}</div>`:""}
     ${ed?`<textarea class="vnote-in" data-k="${esc(k)}" rows="3" placeholder="例句、搭配、容易混淆的字…" spellcheck="false">${esc(c.note||"")}</textarea>`:""}
     <div class="vc-acts">${src?`<button class="linkbtn vc-src" data-act="jump" data-id="${esc(c.src)}">${esc(qLabel(c.src))}</button>`:""}
-      <span class="vc-btns"><button class="linkbtn" data-act="vcopy" data-k="${esc(k)}">複製</button><button class="linkbtn" data-act="vnote" data-k="${esc(k)}">${ed?"完成":c.note?"編輯筆記":"筆記"}</button><button class="linkbtn" data-act="vdel" data-k="${esc(k)}">刪除</button></span></div>
+      <span class="vc-btns"><button class="linkbtn" data-act="vocc" data-k="${esc(k)}" aria-expanded="${vOcc.has(k)}">${vOcc.has(k)?"收起題目":"出現題目"}</button><button class="linkbtn" data-act="vcopy" data-k="${esc(k)}">複製</button><button class="linkbtn" data-act="vnote" data-k="${esc(k)}">${ed?"完成":c.note?"編輯筆記":"筆記"}</button><button class="linkbtn" data-act="vdel" data-k="${esc(k)}">刪除</button></span></div>
   </div>`}
 function vDateLabel(t){const d=dayStart(t),t0=dayStart(now());if(d===t0)return "今天";if(d===addDays(t0,-1))return "昨天";const x=new Date(d);return (x.getMonth()+1)+"/"+x.getDate()}
 // 卡片釋義以目前的詞典為準（詞典更新後舊卡片也跟著更新），詞典還沒載入或查不到時用存卡時的釋義
@@ -2236,11 +2288,12 @@ function vVocab(){
   if(!GL&&Object.keys(st.vocab).length){glWant=true;loadGloss()}
   const all=Object.keys(st.vocab),task=vTask(),t0=dayStart(now()),byAt=(a,b)=>(st.vocab[b].at||0)-(st.vocab[a].at||0);
   const todayK=task.filter(k=>st.vocab[k].at>=t0).sort(byAt),yestK=task.filter(k=>st.vocab[k].at<t0).sort(byAt),left=task.filter(k=>!vDone(k)).length;
-  const tab=st.vtab==="all"?"all":"task",grid=ks=>`<div class="vgrid">${ks.map(vCard).join("")}</div>`;
+  const tab=st.vtab==="all"||st.vtab==="wrong"?st.vtab:"task",grid=ks=>`<div class="vgrid">${ks.map(vCard).join("")}</div>`;
+  const wrongK=all.filter(vSrcWrong).sort(byAt),noSrc=all.filter(k=>{const s=st.vocab[k].src;return !s||!QM[s]}).length;
   let h=`${backHome}<h1>單字卡</h1><p class="sub">題目交卷檢討時，滑鼠移到英文字上（手機點一下），按提示框裡的「存單字」或「存片語」就會加進來。今天和昨天存的卡片排進今日任務：點卡片看翻譯，翻過面就算複習完成。</p>
   <div class="kpis"><div class="kpi"><span>今日任務</span><b>${task.length-left}／${task.length}</b></div><div class="kpi"><span>今天新存</span><b>${todayK.length}</b></div>
     <div class="kpi"><span>昨天存的</span><b>${yestK.length}</b></div><div class="kpi"><span>全部卡片</span><b>${all.length}</b></div></div>
-  <div class="chips" role="tablist" aria-label="單字卡">${[["task","今日任務"],["all",`全部（${all.length}）`]].map(([k,n])=>`<button role="tab" aria-selected="${tab===k}" class="${tab===k?"on":""}" data-act="vtab" data-t="${k}">${n}</button>`).join("")}</div>`;
+  <div class="chips" role="tablist" aria-label="單字卡">${[["task","今日任務"],["wrong",`來源題答錯（${wrongK.length}）`],["all",`全部（${all.length}）`]].map(([k,n])=>`<button role="tab" aria-selected="${tab===k}" class="${tab===k?"on":""}" data-act="vtab" data-t="${k}">${n}</button>`).join("")}</div>`;
   if(tab==="task"){
     if(!task.length)h+=`<p style="margin-top:14px">${all.length?"今天和昨天都沒有新存的卡片。可以到「全部」翻翻以前的卡片。":"還沒有單字卡。到任一 TOEIC 題目交卷檢討，滑鼠移到英文字上就能存。"}</p>`;
     else{
@@ -2248,6 +2301,9 @@ function vVocab(){
       if(yestK.length)h+=`<h2>昨天存的（${yestK.length}）</h2>`+grid(yestK);
       if(todayK.length)h+=`<h2>今天存的（${todayK.length}）</h2>`+grid(todayK);
     }
+  }else if(tab==="wrong"){
+    h+=`<p class="note" style="margin-top:10px">存卡時的來源題，目前的作答紀錄是答錯的卡片；重做答對之後就會從這裡消失。沒作答的題目不算答錯。${noSrc?`另有 ${noSrc} 張查不到來源題（存卡時沒有記到題目，或題庫尚未解鎖），不列在這裡。`:""}</p>`;
+    h+=wrongK.length?grid(wrongK):`<p style="margin-top:14px">${all.length?"沒有來源題答錯的卡片。":"還沒有單字卡。"}</p>`;
   }else if(!all.length)h+=`<p style="margin-top:14px">還沒有單字卡。</p>`;
   else{const g=new Map();all.sort(byAt).forEach(k=>{const d=dayStart(st.vocab[k].at||0);if(!g.has(d))g.set(d,[]);g.get(d).push(k)});
     g.forEach((ks,d)=>{h+=`<h2>${vDateLabel(d)}（${ks.length}）</h2>`+grid(ks)})}
@@ -2472,7 +2528,8 @@ document.addEventListener("click",e=>{
       st.pr={ids,ans:{},i:0,src:"nrev",scope:isOwner()?"all":"toeic",title:"筆記複習"};st.view="prac";scroll=toTop;break}
     case"nrevReset":st.nrev[d.id]={lv:0,due:dayStart(now())};st.nrevT[d.id]=now();dirty=true;break;
     case"noteDone":noteEdit.delete(d.id);persist();Sync.schedule();render();return;
-    case"vtab":st.vtab=d.t==="all"?"all":"task";break;
+    case"vtab":st.vtab=d.t==="all"||d.t==="wrong"?d.t:"task";break;
+    case"vocc":if(vOcc.has(d.k))vOcc.delete(d.k);else vOcc.add(d.k);render();return;
     case"vflip":{const c=st.vocab[d.k];if(!c)return;
       if(vFlip.has(d.k))vFlip.delete(d.k);else{vFlip.add(d.k);if(!vDone(d.k))vocabSet(d.k,{...c,rv:now()})}
       render();return}
@@ -2480,9 +2537,9 @@ document.addEventListener("click",e=>{
       vNoteEdit.add(k);render();const ta=[...app.querySelectorAll(".vnote-in")].find(x=>x.dataset.k===k);
       if(ta){ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length)}return}
     case"vcopy":{const c=st.vocab[d.k];if(!c)return;
-      copyText([`${c.k}（${c.t==="p"?"片語":"單字"}）`,vMean(c),c.ex?"例句："+c.ex:"",c.src&&QM[c.src]?"出處："+qLabel(c.src):"",c.note?"筆記："+c.note:""].filter(Boolean).join("\n"),()=>showToast("已複製"));return}
+      copyText([`${c.k}（${c.t==="p"?"片語":"單字"}）`,vMean(c),c.ex?"例句："+c.ex:"",...(x=>x?[...(x.col||[]).map(([en,zh])=>"搭配："+en+"　"+zh),x.ex?"補充例句"+(x.by==="ai"?"（AI 生成）":"")+"："+x.ex.join("　"):""]:[])(c.t==="w"&&GL&&GL.x&&GL.x[c.k]),c.src&&QM[c.src]?"出處："+qLabel(c.src):"",c.note?"筆記："+c.note:""].filter(Boolean).join("\n"),()=>showToast("已複製"));return}
     case"vdel":{const c=st.vocab[d.k];if(!c||!confirm(`刪除單字卡「${c.k}」？`))return;
-      vocabSet(d.k,null);vFlip.delete(d.k);vNoteEdit.delete(d.k);render();return}
+      vocabSet(d.k,null);vFlip.delete(d.k);vNoteEdit.delete(d.k);vOcc.delete(d.k);render();return}
     case"flag":toggleFlag(d.id);break;
     case"copy":copyQuestion(d.id);return;
     case"pstartAgain":{
