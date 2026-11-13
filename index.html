@@ -384,6 +384,12 @@ code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85em;backgroun
 /* Toast */
 .toast{position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(16px);background:var(--ink);color:var(--on-ink);padding:9px 18px;border-radius:8px;font-size:.86rem;opacity:0;transition:all .2s ease;pointer-events:none;z-index:99;max-width:calc(100vw - 32px);text-align:center}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+/* 網頁內的確認視窗（askOK）：瀏覽器擋掉 confirm() 時改用這個 */
+.askbox{position:fixed;inset:0;z-index:1100;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.4)}
+.askbox[hidden]{display:none}
+.askbox .ask-in{width:min(380px,100%);background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:18px 18px 14px;box-shadow:0 10px 32px rgba(0,0,0,.25)}
+.askbox p{margin:0 0 14px;line-height:1.65;white-space:pre-line}
+.askbox .ask-acts{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 
 @media (hover:none){
   .row:hover{background:none}
@@ -429,6 +435,9 @@ code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85em;backgroun
 .vc-word{font-size:1.25rem;font-weight:700;line-height:1.3;overflow-wrap:anywhere}
 .vc-hint{margin-top:auto;font-size:.8rem;color:var(--faint)}
 .vc-mean{white-space:pre-line;font-size:.9rem;line-height:1.6}
+.vc-upd{border:1px solid var(--ink);border-radius:999px;padding:0 8px;color:var(--ink);font-weight:600}
+.vc-old{white-space:pre-line;font-size:.8rem;line-height:1.55;color:var(--faint);text-decoration:line-through;text-decoration-color:var(--line)}
+.vc-old b{font-weight:400;text-decoration:none;display:block;color:var(--muted)}
 .vc-ex{font-size:.84rem;line-height:1.6;color:var(--muted)}
 .vc-ex mark{background:var(--hl);color:inherit;border-radius:2px;padding:0 1px}
 .vc-note{margin:0 16px 6px;padding:8px 10px;border-radius:8px;background:var(--soft);font-size:.84rem;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
@@ -1047,6 +1056,23 @@ function fallbackCopy(text,cb){
   try{document.execCommand("copy");if(cb)cb()}catch(e){alert("複製失敗，請手動複製")}
   document.body.removeChild(ta);
 }
+/* 確認後才執行：先用瀏覽器的 confirm()；有些環境（App 內嵌瀏覽器、Chrome 勾過「禁止此網頁再產生對話方塊」）會不跳視窗、
+   直接回傳 false，按鈕看起來就像沒反應。回傳 false 的速度快到不可能是人按的（< 60ms）時，改用網頁內的確認視窗。回傳 Promise<boolean>。 */
+let askDlg=null;
+function askOK(msg,okLabel="確定"){
+  const t=performance.now();let r=false;try{r=confirm(msg)}catch(e){}
+  if(r||performance.now()-t>=60)return Promise.resolve(!!r);
+  return new Promise(res=>{
+    if(!askDlg){askDlg=document.createElement("div");askDlg.className="askbox";askDlg.hidden=true;document.body.appendChild(askDlg)}
+    const back=document.activeElement;
+    askDlg.innerHTML=`<div class="ask-in" role="alertdialog" aria-modal="true" aria-labelledby="ask-msg"><p id="ask-msg">${esc(msg)}</p>
+      <div class="ask-acts"><button type="button" class="btn" data-ask="0">取消</button><button type="button" class="btn primary" data-ask="1">${esc(okLabel)}</button></div></div>`;
+    askDlg.hidden=false;
+    const done=v=>{askDlg.hidden=true;askDlg.onclick=null;document.removeEventListener("keydown",key,true);if(back&&back.focus)back.focus();res(v)};
+    const key=e=>{if(e.key==="Escape"){e.preventDefault();e.stopPropagation();done(false)}};
+    askDlg.onclick=e=>{const b=e.target.closest("[data-ask]");if(b)done(b.dataset.ask==="1");else if(e.target===askDlg)done(false)};
+    document.addEventListener("keydown",key,true);
+    askDlg.querySelector('[data-ask="1"]').focus()})}
 function copyText(text,cb){
   if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(cb).catch(()=>fallbackCopy(text,cb));
   else fallbackCopy(text,cb);
@@ -1425,6 +1451,7 @@ glTip.addEventListener("mouseleave",e=>{if(!(e.relatedTarget&&glOn.some(x=>x.con
 glTip.addEventListener("click",e=>{const b=e.target.closest("[data-gsave]");if(!b||!glCur)return;
   const t=b.dataset.gsave,c=t==="p"?{k:glCur.pk,t:"p",m:GL.p[glCur.pk]||""}:glCur.wc;if(!c)return;
   vocabSet(vKey(c.t,c.k),{...c,ex:glSentence(glCur.el),src:glSrc(glCur.el),at:now(),note:""});
+  VSEEN[vKey(c.t,c.k)]=vSig(c);vSeenSave();   // 剛存的卡片就是最新內容，不算「內容已更新」
   b.disabled=true;b.textContent="已存 "+c.k;showToast(`已存到單字卡：${c.k}`);renderTopbar();renderSide()});
 document.addEventListener("click",e=>{if(glTip.contains(e.target))return;const el=e.target.closest&&e.target.closest(".gw");if(el)glShow(el);else glHide()},true);
 window.addEventListener("scroll",e=>{if(!glTip.contains(e.target))glHide()},true);
@@ -2271,9 +2298,9 @@ function vMark(ex,k){
 function vCard(k){const c=st.vocab[k];if(!c)return "";const f=vFlip.has(k),d=vDone(k),ed=vNoteEdit.has(k),src=c.src&&QM[c.src];
   return `<div class="vcard${f?" flip":""}${d?" done":""}">
     <button type="button" class="vc-face" data-act="vflip" data-k="${esc(k)}" aria-expanded="${f}">
-      <span class="vc-top"><span class="vc-type">${c.t==="p"?"片語":"單字"}</span>${d?`<span class="vc-ok">今天已複習</span>`:""}</span>
+      <span class="vc-top"><span class="vc-type">${c.t==="p"?"片語":"單字"}</span>${vUpd(k)?`<span class="vc-upd">內容已更新</span>`:""}${d?`<span class="vc-ok">今天已複習</span>`:""}</span>
       <span class="vc-word">${esc(c.k)}</span>
-      ${f?`<span class="vc-mean">${esc(vMean(c))}</span>${c.ex?`<span class="vc-ex">${vMark(c.ex,c.k)}</span>`:""}${c.t==="w"?glExtra(c.k,"vc-x"):""}`:`<span class="vc-hint">點卡片看翻譯</span>`}
+      ${f?`<span class="vc-mean">${esc(vMean(c))}</span>${vOld[k]&&vOld[k]!==vMean(c)?`<span class="vc-old"><b>更新前的釋義</b>${esc(vOld[k])}</span>`:""}${GL&&vMean({...c,m:""})===""?`<span class="vc-hint" style="margin-top:0">字典目前沒有這個條目，顯示的是存卡時的釋義。</span>`:""}${c.ex?`<span class="vc-ex">${vMark(c.ex,c.k)}</span>`:""}${c.t==="w"?glExtra(c.k,"vc-x"):""}`:`<span class="vc-hint">點卡片看翻譯</span>`}
     </button>
     ${vOcc.has(k)?vOccHTML(c):""}
     ${c.note&&!ed?`<div class="vc-note">${esc(c.note)}</div>`:""}
@@ -2282,18 +2309,29 @@ function vCard(k){const c=st.vocab[k];if(!c)return "";const f=vFlip.has(k),d=vDo
       <span class="vc-btns"><button class="linkbtn" data-act="vocc" data-k="${esc(k)}" aria-expanded="${vOcc.has(k)}">${vOcc.has(k)?"收起題目":"出現題目"}</button><button class="linkbtn" data-act="vcopy" data-k="${esc(k)}">複製</button><button class="linkbtn" data-act="vnote" data-k="${esc(k)}">${ed?"完成":c.note?"編輯筆記":"筆記"}</button><button class="linkbtn" data-act="vdel" data-k="${esc(k)}">刪除</button></span></div>
   </div>`}
 function vDateLabel(t){const d=dayStart(t),t0=dayStart(now());if(d===t0)return "今天";if(d===addDays(t0,-1))return "昨天";const x=new Date(d);return (x.getMonth()+1)+"/"+x.getDate()}
-// 卡片釋義以目前的詞典為準（詞典更新後舊卡片也跟著更新），詞典還沒載入或查不到時用存卡時的釋義
-const vMean=c=>GL&&(c.t==="p"?GL.p[c.k]:GL.w[c.k])||c.m;
+// 卡片釋義以目前的詞典為準（詞典更新後舊卡片也跟著更新）；卡片的字後來被對應到原形時用原形的釋義；詞典還沒載入或查不到時用存卡時的釋義
+const vMean=c=>GL&&(c.t==="p"?GL.p[c.k]:GL.w[c.k]||GL.w[GL.f[c.k]])||c.m;
+/* 「內容已更新」：這張卡現在的內容（釋義＋教學補充）和我上次翻開看到的不一樣。
+   上次看到的內容指紋記在本機 VSEEN（localStorage，不同步、不動卡片資料）；沒有紀錄的卡片以存卡時的釋義 c.m 當基準。
+   翻到背面就算看過（vflip）：更新指紋，並把 c.m 換成目前的釋義（c.m 是備份、同步與詞典載入失敗時用的快照）。
+   vOld：本次瀏覽中剛看過的更新（鍵 → 更新前的釋義），讓翻面後仍看得到標記與舊釋義。 */
+const VSEEN_KEY=KEY+"-vseen",vOld={};let VSEEN={};try{VSEEN=JSON.parse(localStorage.getItem(VSEEN_KEY)||"{}")||{}}catch(e){}
+const vSeenSave=()=>{try{localStorage.setItem(VSEEN_KEY,JSON.stringify(VSEEN))}catch(e){}};
+const vHash=s=>{let h=5381;for(let i=0;i<s.length;i++)h=(h*33^s.charCodeAt(i))>>>0;return h.toString(36)};
+const vSig=c=>vHash((vMean(c)||"")+(c.t==="w"&&GL.x&&GL.x[c.k]?"\n"+JSON.stringify(GL.x[c.k]):""));
+const vChanged=k=>{const c=st.vocab[k];return !!(GL&&c&&vSig(c)!==(VSEEN[k]||vHash(c.m||"")))};
+const vUpd=k=>vChanged(k)||vOld[k]!==undefined;
 function vVocab(){
   if(!GL&&Object.keys(st.vocab).length){glWant=true;loadGloss()}
   const all=Object.keys(st.vocab),task=vTask(),t0=dayStart(now()),byAt=(a,b)=>(st.vocab[b].at||0)-(st.vocab[a].at||0);
   const todayK=task.filter(k=>st.vocab[k].at>=t0).sort(byAt),yestK=task.filter(k=>st.vocab[k].at<t0).sort(byAt),left=task.filter(k=>!vDone(k)).length;
-  const tab=st.vtab==="all"||st.vtab==="wrong"?st.vtab:"task",grid=ks=>`<div class="vgrid">${ks.map(vCard).join("")}</div>`;
+  const tab=["all","wrong","upd"].includes(st.vtab)?st.vtab:"task",grid=ks=>`<div class="vgrid">${ks.map(vCard).join("")}</div>`;
   const wrongK=all.filter(vSrcWrong).sort(byAt),noSrc=all.filter(k=>{const s=st.vocab[k].src;return !s||!QM[s]}).length;
-  let h=`${backHome}<h1>單字卡</h1><p class="sub">題目交卷檢討時，滑鼠移到英文字上（手機點一下），按提示框裡的「存單字」或「存片語」就會加進來。今天和昨天存的卡片排進今日任務：點卡片看翻譯，翻過面就算複習完成。</p>
-  <div class="kpis"><div class="kpi"><span>今日任務</span><b>${task.length-left}／${task.length}</b></div><div class="kpi"><span>今天新存</span><b>${todayK.length}</b></div>
+  const updK=all.filter(vUpd).sort(byAt),updLeft=updK.filter(vChanged).length;
+  let h=`${backHome}<h1>單字卡</h1><p class="sub"></p>
+  <div class="kpis"><div class="kpi"><span>今天新存</span><b>${todayK.length}</b></div>
     <div class="kpi"><span>昨天存的</span><b>${yestK.length}</b></div><div class="kpi"><span>全部卡片</span><b>${all.length}</b></div></div>
-  <div class="chips" role="tablist" aria-label="單字卡">${[["task","今日任務"],["wrong",`來源題答錯（${wrongK.length}）`],["all",`全部（${all.length}）`]].map(([k,n])=>`<button role="tab" aria-selected="${tab===k}" class="${tab===k?"on":""}" data-act="vtab" data-t="${k}">${n}</button>`).join("")}</div>`;
+  <div class="chips" role="tablist" aria-label="單字卡">${[["task","今日任務"],["wrong",`來源題答錯（${wrongK.length}）`],...(updK.length||tab==="upd"?[["upd",`內容更新（${updLeft}）`]]:[]),["all",`全部（${all.length}）`]].map(([k,n])=>`<button role="tab" aria-selected="${tab===k}" class="${tab===k?"on":""}" data-act="vtab" data-t="${k}">${n}</button>`).join("")}</div>`;
   if(tab==="task"){
     if(!task.length)h+=`<p style="margin-top:14px">${all.length?"今天和昨天都沒有新存的卡片。可以到「全部」翻翻以前的卡片。":"還沒有單字卡。到任一 TOEIC 題目交卷檢討，滑鼠移到英文字上就能存。"}</p>`;
     else{
@@ -2304,9 +2342,14 @@ function vVocab(){
   }else if(tab==="wrong"){
     h+=`<p class="note" style="margin-top:10px">存卡時的來源題，目前的作答紀錄是答錯的卡片；重做答對之後就會從這裡消失。沒作答的題目不算答錯。${noSrc?`另有 ${noSrc} 張查不到來源題（存卡時沒有記到題目，或題庫尚未解鎖），不列在這裡。`:""}</p>`;
     h+=wrongK.length?grid(wrongK):`<p style="margin-top:14px">${all.length?"沒有來源題答錯的卡片。":"還沒有單字卡。"}</p>`;
+  }else if(tab==="upd"){
+    h+=`<p class="note" style="margin-top:10px">字典更新後，釋義或補充內容和你上次看到的不一樣的卡片。卡片一律顯示最新的字典內容；翻開看過就算已讀，會同時列出更新前的釋義供對照。你的例句、筆記和複習紀錄不受影響。</p>`;
+    h+=!GL?`<p style="margin-top:14px">${glState===3?"詞典載入失敗，重新整理頁面後再試。":"詞典載入中…"}</p>`:updK.length?grid(updK):`<p style="margin-top:14px">沒有內容更新的卡片。</p>`;
   }else if(!all.length)h+=`<p style="margin-top:14px">還沒有單字卡。</p>`;
   else{const g=new Map();all.sort(byAt).forEach(k=>{const d=dayStart(st.vocab[k].at||0);if(!g.has(d))g.set(d,[]);g.get(d).push(k)});
     g.forEach((ks,d)=>{h+=`<h2>${vDateLabel(d)}（${ks.length}）</h2>`+grid(ks)})}
+  // 目前載入的字典：用來確認網站上的字典是不是新版（gen.extra 是 glossary_extra.json 的雜湊，每次更新字典都會變）
+  if(all.length)h+=`<p class="note" style="margin-top:18px">${GL?`目前的字典：單字 ${Object.keys(GL.w).length.toLocaleString()}、片語 ${Object.keys(GL.p).length.toLocaleString()}${GL.x?`、有補充的字 ${Object.keys(GL.x).length.toLocaleString()}`:""}${GL.gen&&GL.gen.extra?`．版本 ${esc(GL.gen.extra.slice(0,6))}`:"．舊版（沒有版本資訊）"}。卡片內容會自動跟著字典更新。`:glState===3?"字典載入失敗，卡片暫時顯示存卡時的釋義；重新整理頁面後再試。":"字典載入中…"}</p>`;
   return h;
 }
 let vNoteTm=0;
@@ -2528,18 +2571,22 @@ document.addEventListener("click",e=>{
       st.pr={ids,ans:{},i:0,src:"nrev",scope:isOwner()?"all":"toeic",title:"筆記複習"};st.view="prac";scroll=toTop;break}
     case"nrevReset":st.nrev[d.id]={lv:0,due:dayStart(now())};st.nrevT[d.id]=now();dirty=true;break;
     case"noteDone":noteEdit.delete(d.id);persist();Sync.schedule();render();return;
-    case"vtab":st.vtab=d.t==="all"||d.t==="wrong"?d.t:"task";break;
+    case"vtab":st.vtab=["all","wrong","upd"].includes(d.t)?d.t:"task";break;
     case"vocc":if(vOcc.has(d.k))vOcc.delete(d.k);else vOcc.add(d.k);render();return;
     case"vflip":{const c=st.vocab[d.k];if(!c)return;
-      if(vFlip.has(d.k))vFlip.delete(d.k);else{vFlip.add(d.k);if(!vDone(d.k))vocabSet(d.k,{...c,rv:now()})}
+      if(vFlip.has(d.k))vFlip.delete(d.k);else{vFlip.add(d.k);let nc=c;
+        // 內容有更新的卡片：翻開就算看過（記指紋），並把快照 c.m 換成目前的釋義
+        if(vChanged(d.k)){vOld[d.k]=c.m||"";VSEEN[d.k]=vSig(c);vSeenSave();const m=vMean(c);if(m&&m!==c.m)nc={...c,m}}
+        if(!vDone(d.k))nc={...nc,rv:now()};
+        if(nc!==c)vocabSet(d.k,nc)}
       render();return}
     case"vnote":{const k=d.k;if(vNoteEdit.has(k)){vNoteEdit.delete(k);persist();Sync.schedule();render();return}
       vNoteEdit.add(k);render();const ta=[...app.querySelectorAll(".vnote-in")].find(x=>x.dataset.k===k);
       if(ta){ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length)}return}
     case"vcopy":{const c=st.vocab[d.k];if(!c)return;
       copyText([`${c.k}（${c.t==="p"?"片語":"單字"}）`,vMean(c),c.ex?"例句："+c.ex:"",...(x=>x?[...(x.col||[]).map(([en,zh])=>"搭配："+en+"　"+zh),x.ex?"補充例句"+(x.by==="ai"?"（AI 生成）":"")+"："+x.ex.join("　"):""]:[])(c.t==="w"&&GL&&GL.x&&GL.x[c.k]),c.src&&QM[c.src]?"出處："+qLabel(c.src):"",c.note?"筆記："+c.note:""].filter(Boolean).join("\n"),()=>showToast("已複製"));return}
-    case"vdel":{const c=st.vocab[d.k];if(!c||!confirm(`刪除單字卡「${c.k}」？`))return;
-      vocabSet(d.k,null);vFlip.delete(d.k);vNoteEdit.delete(d.k);vOcc.delete(d.k);render();return}
+    case"vdel":{const c=st.vocab[d.k];if(!c)return;askOK(`刪除單字卡「${c.k}」？`,"刪除").then(ok=>{if(!ok||!st.vocab[d.k])return;
+      vocabSet(d.k,null);vFlip.delete(d.k);vNoteEdit.delete(d.k);vOcc.delete(d.k);delete vOld[d.k];if(VSEEN[d.k]){delete VSEEN[d.k];vSeenSave()}render()});return}
     case"flag":toggleFlag(d.id);break;
     case"copy":copyQuestion(d.id);return;
     case"pstartAgain":{
@@ -2574,8 +2621,8 @@ document.addEventListener("click",e=>{
       if(f<0){showToast("本卷沒有錯題");return}st.cur[ex.id]=f;scroll=qTop;break}
     case"retryWrong":{let f=-1;ex.qs.forEach((q,i)=>{const id=ex.id+"-"+i;if(isWrong(id)){delAns(id);if(f<0)f=i}});
       if(f<0){showToast("本卷沒有錯題");return}st.cur[ex.id]=f;scroll=toTop;break}
-    case"aiLock":if(!confirm("登出站長自用？會清除這台裝置記住的密碼並鎖定 AI 題庫，作答紀錄會保留。"))return;
-      AILock.forget();st.mode="toeic";st.view="home";persist();location.reload();return;
+    case"aiLock":askOK("登出站長自用？會清除這台裝置記住的密碼並鎖定 AI 題庫，作答紀錄會保留。","登出").then(ok=>{if(!ok)return;
+      AILock.forget();st.mode="toeic";st.view="home";persist();location.reload()});return;
     case"theme":applyTheme(d.v);renderTopbar();return;
     case"chartCat":st.chartCat=d.c;persist();render();return;
     case"chartFirst":st.chartFirst=d.v==="1";persist();render();return;
