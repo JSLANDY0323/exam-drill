@@ -60,6 +60,8 @@ button:focus-visible,input:focus-visible,summary:focus-visible,textarea:focus-vi
 .tb-nav button.on{color:var(--ink);border-bottom-color:var(--ink)}
 .tb-badge{display:inline-block;min-width:18px;padding:0 5px;margin-left:5px;border-radius:999px;background:var(--ink);color:var(--on-ink);font-size:.68rem;font-weight:600;line-height:18px;text-align:center;font-variant-numeric:tabular-nums}
 .side-item.on .tb-badge{background:var(--on-ink);color:var(--ink)}
+.side-subs{display:flex;flex-direction:column;gap:4px;border-top:1px solid var(--line);margin-top:8px;padding-top:8px}
+.side-ab{flex:0 0 18px;width:18px;text-align:center;font-size:.78rem;font-weight:700;letter-spacing:-.02em}
 .side-tools{display:flex;flex-direction:column;gap:4px;border-top:1px solid var(--line);margin-top:8px;padding-top:8px}
 @media (min-width:760px){.tb-nav{display:flex}.side-tools{display:none}}
 /* 側邊欄展開時頂列較擠：同步只留圓點（滑鼠移上去看狀態） */
@@ -69,7 +71,7 @@ button:focus-visible,input:focus-visible,summary:focus-visible,textarea:focus-vi
 .nlist li{padding:10px 0;border-bottom:1px solid var(--line);font-size:.9rem}
 .nlist .nsnip{margin:2px 0 0;font-size:.84rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nlist .nsnip>*{display:inline;margin:0;font-size:inherit}
-/* 側邊欄：TOEIC／站長自用；寬螢幕固定在左側可收合，窄螢幕從左側滑出 */
+/* 側邊欄：首頁＋工具（登入後首頁是完整目錄）；寬螢幕固定在左側可收合，窄螢幕從左側滑出 */
 .side{position:fixed;top:0;left:0;bottom:0;z-index:60;width:216px;background:var(--bg);border-right:1px solid var(--line);padding:env(safe-area-inset-top,0px) 10px 16px;display:flex;flex-direction:column;gap:4px;overflow:hidden;transform:translateX(-100%);visibility:hidden;transition:transform .2s ease,visibility 0s .2s}
 body.side-open .side{transform:none;visibility:visible;transition:transform .2s ease}
 .side-head{height:57px;flex:none;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);margin:0 -10px 8px;padding:0 12px}
@@ -552,7 +554,7 @@ function buildIndex(){
   ALL.forEach(ex=>ex.qs.forEach((q,i)=>{QM[ex.id+"-"+i]={ex,i,q}}));
 }
 /* ---------- AI應用規劃師題庫加密：輸入密碼後才在瀏覽器解密（PBKDF2-SHA256＋AES-256-GCM，加密見 tools/encrypt_ai.py） ---------- */
-// 這組密碼同時是「站長自用」的登入：解鎖成功（ok）才顯示統計、巨量資料、AI 等完整目錄
+// 這組密碼就是網站的「登入」：解鎖成功（ok）就是登入狀態，顯示統計、巨量資料、AI 等完整目錄
 const AILock={locked:[],msg:"",busy:false,ok:false,key:null,KEY:"quiz-ai-key",
   b64:s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0)),
   async derive(pw,env){const base=await crypto.subtle.importKey("raw",new TextEncoder().encode(pw),"PBKDF2",false,["deriveKey"]);
@@ -846,8 +848,8 @@ const app=document.getElementById("app");
 const topbar=document.getElementById("topbar");
 const side=document.getElementById("side"), scrim=document.getElementById("scrim");
 const isWide=()=>window.matchMedia("(min-width:768px)").matches;
-// 對外只顯示 TOEIC；st.mode==="owner" 且已用密碼解鎖，才是站長自用的完整目錄
-const isOwner=()=>st.mode==="owner"&&AILock.ok;
+// 登入（已用密碼解鎖）＝完整目錄；登出＝只顯示 TOEIC 刷題。st.mode 已不再使用（舊紀錄裡可能還有）
+const isOwner=()=>AILock.ok;
 
 /* ---------- 跨裝置同步（GitHub Gist） ---------- */
 const SYNC_KEY="quiz-sync-v1", GIST_FILE="quiz-progress.json", GIST_DESC="刷題學習系統｜作答紀錄同步（請勿刪除）";
@@ -976,8 +978,8 @@ function renderTopbar(){
     <div class="tb-right">
       <div class="themesw" role="group" aria-label="顯示主題">${[["light","淺色"],["dark","深色"],["system","系統"]].map(([v,t])=>`<button data-act="theme" data-v="${v}" class="${getTheme()===v?"on":""}" aria-pressed="${getTheme()===v}">${t}</button>`).join("")}</div>
       ${isOwner()?`<button class="syncbtn" data-act="go" data-v="sync" data-s="${s}" title="${esc(Sync.msg||"跨裝置同步")}"><i class="syncdot"></i><span>${label}</span></button>`:""}
-      ${AILock.ok?`<button class="authbtn" data-act="aiLock" title="登出：鎖定題庫並清除這台裝置記住的密碼" aria-label="登出站長自用">${I.unlock}<span>登出</span></button>`
-        :`<button class="authbtn" data-act="go" data-v="unlock" title="登入：輸入密碼解鎖站長自用" aria-label="站長登入">${I.lock}<span>登入</span></button>`}
+      ${AILock.ok?`<button class="authbtn" data-act="aiLock" title="登出：鎖定題庫並清除這台裝置記住的密碼，回到 TOEIC 刷題" aria-label="登出">${I.unlock}<span>登出</span></button>`
+        :`<button class="authbtn" data-act="go" data-v="unlock" title="登入：輸入密碼顯示完整目錄" aria-label="登入">${I.lock}<span>登入</span></button>`}
     </div>
   </div>`;
 }
@@ -1003,11 +1005,14 @@ function toggleSide(){
   renderSide();renderTopbar();
 }
 function closeSide(){document.body.classList.remove("side-open")}
+const SIDE_SUBS=[["toeic","TOEIC","T"],["stat","統計學","統"],["bigdata","巨量資料概論","巨"],["ai","AI應用規劃師","AI"]];
+const SUB_SCOPE={toeic:"toeic",stat:"stat",bigdata:"bigdata",ai:"ai_jr"};
 function renderSide(){
-  const own=isOwner()||st.view==="unlock",exp=sideExpanded();
-  const item=(v,on,icon,label)=>`<button class="side-item ${on?"on":""}" data-act="mode" data-v="${v}" title="${label}" aria-current="${on?"page":"false"}">${icon}<span class="lbl">${label}</span></button>`;
+  const exp=sideExpanded(),home=st.view==="home",own=isOwner(),hl=own?"全部目錄":"TOEIC 刷題",sub=own?st.homeSub||"":"";
+  // 登入時：全部目錄＋各科目（點了只列那個科目，錯題分析／抽考也切到那個科目）
+  const subs=own?SIDE_SUBS.map(([k,n,ab])=>{const on=home&&sub===k;return `<button class="side-item ${on?"on":""}" data-act="sub" data-v="${k}" title="${n}" aria-current="${on?"page":"false"}"><span class="side-ab" aria-hidden="true">${ab}</span><span class="lbl">${n}</span></button>`}).join(""):"";
   side.innerHTML=`<div class="side-head"><button class="menubtn" data-act="side" aria-label="${exp?"收合選單":"展開選單"}" aria-controls="side" aria-expanded="${exp}">${I.menu}</button><span class="side-title lbl">選單</span></div>
-    ${item("toeic",!own,I.book,"TOEIC")}${item("owner",own,AILock.ok?I.unlock:I.lock,"站長自用")}
+    <button class="side-item ${home&&!sub?"on":""}" data-act="sub" data-v="" title="${hl}" aria-current="${home&&!sub?"page":"false"}">${I.book}<span class="lbl">${hl}</span></button>${subs?`<div class="side-subs">${subs}</div>`:""}
     <div class="side-tools">${TOOLS.map(([v,n])=>`<button class="side-item ${toolOn(v)?"on":""}" ${toolAttrs(v)}>${{vocab:I.cards,report:I.file,pset:I.shuffle,notes:I.pen,stats:I.chart}[v]}<span class="lbl">${toolLabel(v,n)}</span></button>`).join("")}</div>`;
 }
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&document.body.classList.contains("side-open")){closeSide();renderSide();renderTopbar()}});
@@ -1350,11 +1355,16 @@ function vHome(){
     :folder("ai","AI應用規劃師",progMeta(A),
       `<li>${aiJr}</li><li>${aiSr}</li>`);
   const toeic=folder("toeic","TOEIC",progMeta(T),toeicItems());
+  // 側邊欄選了單一科目（st.homeSub）：只列那個科目的內容
+  const one={toeic:["TOEIC",progMeta(T),toeicItems()],stat:["統計學",progMeta(S),`<li>${folder("spast","考古題",`${STAT_PAST.length} 份`,spast.map(examLeaf).join(""))}</li>`],
+    bigdata:["巨量資料概論",progMeta(B),`<li>${folder("past","考古題",`${PAST.length} 份`,past.map(examLeaf).join(""))}</li><li>${folder("mock","模擬考",`${EXAMS.length} 份`,EXAMS.map(examLeaf).join(""))}</li>`],
+    ai:["AI應用規劃師",AILock.locked.length?"已加密":progMeta(A),AILock.locked.length?`<li><button class="row" data-act="go" data-v="unlock"><span class="name">輸入密碼解鎖題庫</span><span class="meta">初級．中級</span></button></li>`:`<li>${aiJr}</li><li>${aiSr}</li>`]}[st.homeSub];
+  if(one)return `<h1>${one[0]}</h1><p class="sub">${one[1]}</p><ul class="tree">${one[2]}</ul>`;
   return `<h1>目錄</h1><p class="sub">選擇資料夾開始練習</p>
   <ul class="tree"><li>${stat}</li><li>${bigdata}</li><li>${ai}</li><li>${toeic}</li></ul>`;
 }
 // TOEIC 的 聽力／閱讀／模擬考；站長目錄放在 TOEIC 資料夾內，對外首頁直接放在最上層
-function toeicItems(){
+function toeicItems(pub){
   const p1all=TOEIC_EXAMS.filter(e=>e.part===1&&!e.mock),p2all=TOEIC_EXAMS.filter(e=>e.part===2&&!e.mock),
         p3all=TOEIC_EXAMS.filter(e=>e.part===3&&!e.mock),p4all=TOEIC_EXAMS.filter(e=>e.part===4&&!e.mock);
   const lMock=TOEIC_EXAMS.filter(e=>e.mock==="listening"),rMock=TOEIC_EXAMS.filter(e=>e.mock==="reading");
@@ -1380,6 +1390,7 @@ function toeicItems(){
   const reading=`<li>${folder("p5","Part 5　單句填空",groupMeta(p5all),p5)}</li>`+
       `<li>${folder("p6","Part 6　段落填空",groupMeta(p6all),p6all.map(examLeaf).join(""))}</li>`+
       `<li>${folder("p7","Part 7　閱讀測驗",groupMeta(p7all),p7all.map(examLeaf).join(""))}</li>`;
+  if(pub)return reading;   // 登出：Part 5／6／7 直接放在最上層
   const lAll=[...p1all,...p2all,...p3all,...p4all];
   const lockRow=txt=>`<li><button class="row" data-act="go" data-v="unlock"><span class="name">${txt}</span><span class="meta">需密碼解鎖</span></button></li>`;
   const listening=lAll.length
@@ -1396,17 +1407,17 @@ function toeicItems(){
       `<li>${folder("t_read","閱讀",groupMeta(rAll),reading)}</li>`+
       `<li>${folder("t_mock","模擬考",lMock.length||rMock.length?groupMeta([...lMock,...rMock]):"聽力．閱讀",mock)}</li>`;
 }
-// 對外首頁：只有 TOEIC
+// 登出首頁：只有閱讀 Part 5–7 的原創題。紅藍本、各 10 回等市售書內容（聽力、模擬考）只在登入後出現，連「已加密」的入口都不列
 function vToeic(){const T=scopeStats("toeic");
-  return `<h1>TOEIC 刷題練習</h1><p class="sub">聽力 Part 1–4．閱讀 Part 5–7．模擬考．${T.d?`已作答 <b>${T.d}</b>／${T.n} 題`:`共 ${T.n} 題`}</p>
-  <ul class="tree">${toeicItems()}</ul>`;
+  return `<h1>TOEIC 刷題練習</h1><p class="sub">閱讀 Part 5–7 原創題．${T.d?`已作答 <b>${T.d}</b>／${T.n} 題`:`共 ${T.n} 題`}</p>
+  <ul class="tree">${toeicItems(true)}</ul>`;
 }
 
 function vUnlock(){
   if(!AILock.locked.length)return AILock.ok?vHome():vToeic();
   const ok=window.crypto&&crypto.subtle&&window.DecompressionStream;
-  return `${backHome}<h1>站長自用</h1>
-  <p class="sub">輸入密碼後顯示統計學、巨量資料概論、AI應用規劃師的完整目錄。AI 題目取自市售能力鑑定指南，僅供個人練習，因此加密存放，只在這個瀏覽器內解密。</p>
+  return `${backHome}<h1>登入</h1>
+  <p class="sub">登入後顯示統計學、巨量資料概論、AI應用規劃師的完整目錄。AI 題目取自市售能力鑑定指南，僅供個人練習，因此加密存放，只在這個瀏覽器內解密。</p>
   <form class="panel" id="aiform" style="margin-top:22px">
     <label class="field"><span>密碼</span><input id="aipw" type="password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" ${ok?"":"disabled"}></label>
     <label class="radio"><input type="checkbox" id="airem" checked> 記住這台裝置（之後開啟不用再輸入）</label>
@@ -2051,6 +2062,7 @@ const PART_NAME={1:"照片描述",2:"應答問題",3:"簡短對話",4:"簡短獨
 const mockList=k=>TOEIC_EXAMS.filter(e=>e.mock===k);
 // [代碼, 名稱, 可用, 不可用時的說明]
 function pfKinds(){const lock=AILock.locked.length?"需密碼解鎖":"待新增";
+  if(!isOwner())return [["r","閱讀題",true,""]];   // 登出：只有原創的閱讀題
   return [["l","聽力題",TOEIC_EXAMS.some(e=>e.listen&&!e.mock&&lHasClips(e)),lock],["r","閱讀題",true,""],
     ["ml","聽力整份模擬考",mockList("listening").length>0,lock],["mr","閱讀整份模擬考",mockList("reading").length>0,lock]]}
 function pfCfg(){
@@ -2543,9 +2555,8 @@ document.addEventListener("click",e=>{
   switch(a){
     case"go":closeSide();st.view=d.v;scroll=toTop;break;
     case"side":toggleSide();return;
-    case"mode":closeSide();
-      if(d.v==="owner"){if(AILock.ok){st.mode="owner";st.view="home"}else st.view="unlock"}
-      else{st.mode="toeic";st.view="home";st.scope="toeic"}
+    case"sub":closeSide();st.view="home";st.homeSub=isOwner()&&SUB_SCOPE[d.v]?d.v:"";if(SUB_SCOPE[d.v])st.scope=SUB_SCOPE[d.v];if(!isOwner())st.scope="toeic";scroll=toTop;break;
+    case"mode":closeSide();st.view=d.v==="owner"&&!AILock.ok?"unlock":"home";if(!AILock.ok)st.scope="toeic";
       scroll=toTop;break;
     case"open":st.view="exam";st.exam=d.ex;st.scope=exScope(findEx(d.ex));scroll=toTop;break;
     case"goto":st.cur[st.exam]=+d.i;scroll=qTop;break;
@@ -2621,8 +2632,8 @@ document.addEventListener("click",e=>{
       if(f<0){showToast("本卷沒有錯題");return}st.cur[ex.id]=f;scroll=qTop;break}
     case"retryWrong":{let f=-1;ex.qs.forEach((q,i)=>{const id=ex.id+"-"+i;if(isWrong(id)){delAns(id);if(f<0)f=i}});
       if(f<0){showToast("本卷沒有錯題");return}st.cur[ex.id]=f;scroll=toTop;break}
-    case"aiLock":askOK("登出站長自用？會清除這台裝置記住的密碼並鎖定 AI 題庫，作答紀錄會保留。","登出").then(ok=>{if(!ok)return;
-      AILock.forget();st.mode="toeic";st.view="home";persist();location.reload()});return;
+    case"aiLock":askOK("登出？會清除這台裝置記住的密碼並鎖定 AI 題庫，回到 TOEIC 刷題；作答紀錄會保留。","登出").then(ok=>{if(!ok)return;
+      AILock.forget();st.mode="toeic";st.view="home";st.scope="toeic";persist();location.reload()});return;
     case"theme":applyTheme(d.v);renderTopbar();return;
     case"chartCat":st.chartCat=d.c;persist();render();return;
     case"chartFirst":st.chartFirst=d.v==="1";persist();render();return;
@@ -2739,7 +2750,7 @@ document.addEventListener("submit",async e=>{
   const pw=document.getElementById("aipw").value,rem=document.getElementById("airem").checked;
   if(!pw||AILock.busy)return;
   AILock.busy=true;AILock.msg="";render();
-  try{await AILock.tryPassword(pw,rem);AILock.busy=false;st.mode="owner";st.view="home";persist();render();toTop();showToast("已切換到站長自用")}
+  try{await AILock.tryPassword(pw,rem);AILock.busy=false;st.mode="owner";st.view="home";persist();render();toTop();showToast("已登入")}
   catch(err){AILock.busy=false;AILock.msg="密碼不正確，請再試一次。";render();const i=document.getElementById("aipw");if(i)i.focus()}
 });
 
