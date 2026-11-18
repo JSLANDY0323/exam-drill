@@ -86,7 +86,7 @@ private/TOEIC_Vocabulary_Day1-30.md  # 單字題教材（著作權內容，已�
 - 題庫 `private/toeic_listening.json` 由 `tools/build_listening_quiz.py` 從紅藍本知識庫產生（加密後才上傳）。音檔與圖片也走站長金鑰加密（`data/media/`），在記憶體解密成 blob 播放。
 - 各 10 回聽力 `private/toeic10_listening.json` 由 `tools/build_toeic10_listening.py` 產生（10 份 `mock:"listening"`，每回一個完整音檔，沒有 `partAudios`／英澳口音版）。媒體路徑以 `t10/` 開頭（`img/t10/TEST01_Q1.jpg`、`audio/t10/TEST01.mp3`），原檔在 `private/toeic_md/listening/media/`；網頁用 `lRaw()` 把路徑對應到未加密時的本機位置，`encrypt_ai.py` 用 `media_src()` 找原檔。時戳用 `py tools/listening_ts.py --book toeic10` 產生。
 - 逐題片段：`tools/listening_ts.py` 用語音辨識找每題「Number N」、每個題組「Questions X through Y」的秒數 → `kb/audio_ts.json`；build 時寫成 Part 1／2 題目的 `t`、Part 3／4 題組（`sets[]`）的 `t`，英澳口音版是 `tA`，格式 `[開始, 結束]`（秒）。模擬考的片段以分 Part 音檔（`partAudios`）為準，章節練習以 `audio`／`audioAlt` 為準。
-- 聽力畫面（`vListening`）有兩種模式，選擇記在 localStorage `quiz-lclip`：
+- 聽力畫面（`vListening`）有兩種模式，選擇記在 localStorage `quiz-lclip`。聽力模擬考例外：沒有作答紀錄時先顯示模式選擇（「整回模擬」＝整段播放、預設整回分頁，交卷前不顯示 Part 分頁；「寫一題檢討一題」＝逐題播放），記在 `st.rm[試卷id].mode`（`t`／`p`，`lMockMode`），選了就不看 `quiz-lclip`、也不顯示模式切換；「清除整卷紀錄」會清掉 `st.rm` 回到選擇畫面。舊紀錄沒有 mode 時照 `quiz-lclip`。
   - 整段播放：一個 `<audio id="laudio">` 連續播完，勾選後按「交卷並檢討」一次批改；音檔播完（`ended`）會自動交卷（`lSubmit(ex,true)`，不詢問未作答題）。
   - 逐題播放（預設）：每題／每個題組有自己的播放鍵，用不在畫面裡的 `LClip.au` 播放片段、到結束秒數自動暫停；Part 1／2 選了就批改，題組三題都選了才一起批改。畫面上全是題組時（Part 3／4 練習、模擬考的 Part 3／4 分頁，`lPaged`）一個題組一頁，上方 `.setnav` 切換，目前頁記在 `lSetPage`（不存檔，預設第一個沒寫完的題組）。
 - Part 3／4 題組檢討（兩種模式都一樣）：`.l-rev` 左欄是播放器（`lPlayerHTML`：播放鍵、片段內時間軸、倒退／快轉 3 秒、語速）＋圖表＋原文（`lScriptHTML` 逐句英中對照，可隱藏翻譯，記在 `quiz-lhidetr`），右欄題目與詳解；電腦版左欄 sticky、自己捲動，900px 以下改成上下排。有檢討中的題組時 `.wrap` 加 `lwide` 放寬到 1180px。
@@ -95,7 +95,9 @@ private/TOEIC_Vocabulary_Day1-30.md  # 單字題教材（著作權內容，已�
 ### TOEIC 閱讀模擬考（第一回、第二回）
 
 - 題庫 `private/toeic_reading_mock.json` 由 `tools/build_reading_mock.py` 從紅藍本知識庫 `kb/R/R_AT1.md`、`R_AT2.md`（實戰模擬試題 1、2）產生，加密後才上傳（`data/toeic_reading_mock.enc.json`；還沒加密前是 `{"enc":1,"pending":"檔名"}` 佔位檔，本機解鎖後直接讀 private/ 明文，線上讀不到）。每份一個題組（`mock:"reading"`，`part:0`），Part 5 題目沒有 `p`，Part 6／7 以 `p` 指向 `passages`（多篇文章放 `docs`）；文章文字可含 `**粗體**`、`*斜體*`、`| 表格 |`，Part 6 空格是 `{{題號}}`。題目另有 `kp`（解答本的考點）、`voc`（詞彙）。
-- 畫面 `vRMock`（`render()` 視為分欄閱讀畫面，保留左右欄捲動位置）：先顯示說明與「開始作答」，按下後 `st.rm[試卷id].t0` 開始倒數 75 分鐘（`RM_MS`，離開網頁也算時間，`setInterval` 每秒檢查，時間到自動交卷）。上方 `.setnav` 依 Part 分組切換：Part 5 一頁（`.reading.one` 單欄）、Part 6／7 一篇文章一頁。作答中的選擇存在 `st.p7d`，交卷（`rmSubmit`）才寫進 `st.ans` 並記 `st.rm[id].sub`；作答時間＝用掉的時間平均分給有作答的題目。交卷後（或 st.ans 已有這份的作答）是檢討模式：總分與各 Part 分數、逐題翻譯／考點／詳解／詞彙／筆記，右欄可切換全文翻譯（有 `seg` 的組是逐句對照，見「TOEIC Part 7」欄位說明；沒有就是整段 `trans`）；「重新作答」清掉這份的作答與 `st.rm`。`st.rm` 不同步。
+- 畫面 `vRMock`（`render()` 視為分欄閱讀畫面，保留左右欄捲動位置）：先選模式，記在 `st.rm[試卷id].mode`（舊紀錄沒有 mode 算限時）。
+  - 寫一題檢討一題（`mode:"p"`，`rmPrac`）：不倒數、`rmReview` 永遠是 false，改成逐題／逐組判斷（`uRev`：該組每題都在 `st.ans`）。Part 5 選了就批改（`rmpick` 直接 `setAns`）；Part 6／7 選擇先存 `st.p7d`，整組選完按「對答案」（`rmcheck`）一起批改，該組才顯示正解空格、詳解與全文翻譯。計時鍵 `rmTimeKey`（目前頁、已批改題數），每批改一題重新計時。
+  - 限時模擬（`mode:"t"`）：按下後 `st.rm[試卷id].t0` 開始倒數 75 分鐘（`RM_MS`，離開網頁也算時間，`setInterval` 每秒檢查，時間到自動交卷）。上方 `.setnav` 依 Part 分組切換：Part 5 一頁（`.reading.one` 單欄）、Part 6／7 一篇文章一頁。作答中的選擇存在 `st.p7d`，交卷（`rmSubmit`）才寫進 `st.ans` 並記 `st.rm[id].sub`；作答時間＝用掉的時間平均分給有作答的題目。交卷後（或 st.ans 已有這份的作答）是檢討模式：總分與各 Part 分數、逐題翻譯／考點／詳解／詞彙／筆記，右欄可切換全文翻譯（有 `seg` 的組是逐句對照，見「TOEIC Part 7」欄位說明；沒有就是整段 `trans`）；「重新作答」清掉這份的作答與 `st.rm`。`st.rm` 不同步。
 
 ### 檢討筆記與筆記複習
 

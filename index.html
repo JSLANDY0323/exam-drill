@@ -147,6 +147,11 @@ body.readmode{overflow:hidden}
 .rm-top h1{margin:0!important}
 .rm-bar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px}
 .rm-bar .btn{padding:6px 16px;min-height:0}
+.rm-modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:6px}
+.rm-mode{border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;background:var(--soft)}
+.rm-mode h3{margin:0 0 4px;font-size:16px}
+.rm-mode ul{padding-left:18px;margin:4px 0 12px;flex:1}
+.rm-mode .btn{align-self:flex-start}
 .rm-time{font-variant-numeric:tabular-nums;font-weight:700;font-size:1.1rem}
 .rm-time.low{text-decoration:underline;text-underline-offset:4px}
 .rm-pl{flex:none;align-self:center;font-size:.72rem;font-weight:700;color:var(--muted);margin-left:4px}
@@ -685,7 +690,7 @@ function curSet(ex){const sets=p7Sets(ex),cur=st.cur[ex.id]||0;return sets.find(
 function timingKey(){
   if(!DATA_READY||QT.away||document.visibilityState!=="visible")return null;
   if(st.view==="exam"){const ex=findEx(st.exam);if(!ex)return null;
-    if(ex.mock==="reading")return null;  // 閱讀模擬考自己倒數計時，交卷時平均分給每題
+    if(ex.mock==="reading")return rmTimeKey(ex);  // 限時模擬自己倒數計時（交卷時平均分給每題）；寫一題檢討一題才逐頁計時
     if(ex.listen){const v=lVisIdx(ex);return v.some(i=>st.ans[ex.id+"-"+i]===undefined)?"l|"+ex.id+"|"+(lPartTab||0):null}
     if(ex.part===6||ex.part===7){const set=curSet(ex);if(!set||p7Status(ex,set).done)return null;return "set|"+ex.id+"|"+set.p}
     const id=ex.id+"-"+(st.cur[ex.id]||0);return st.ans[id]===undefined?"q|"+id:null}
@@ -1532,8 +1537,10 @@ function vReading(){
   </div></div>`;
   return h;
 }
-/* ---------- TOEIC 閱讀模擬考（ex.mock==="reading"）：Part 5–7 共 100 題、限時 75 分鐘，整份寫完交卷才批改 ----------
-   st.rm[試卷id]={t0 開始時間, sub 交卷時間}（只存本機）；作答中的選擇放 st.p7d，交卷時寫進 st.ans。
+/* ---------- TOEIC 閱讀模擬考（ex.mock==="reading"）：Part 5–7 共 100 題，開始前選模式 ----------
+   限時模擬（mode "t"）：75 分鐘倒數，整份寫完交卷才批改。寫一題檢討一題（mode "p"）：不計時，Part 5 選了就批改，Part 6／7 一個題組選完按「對答案」。
+   st.rm[試卷id]={mode, t0 開始時間, sub 交卷時間}（只存本機；舊紀錄沒有 mode 算限時）；作答中的選擇放 st.p7d，批改時寫進 st.ans。
+   聽力模擬考也用 st.rm[試卷id].mode：t＝整段音檔一次寫完，p＝逐題播放。
    Part 5 一頁（單欄），Part 6／7 一篇文章一頁（左文章、右題目）；檢討時右側可切換「全文翻譯」。 */
 const RM_MS=75*60e3;
 const RM_DIRS={5:"Directions: A word or phrase is missing in each of the sentences below. Four answer choices are given below each sentence. Select the best answer to complete the sentence.",
@@ -1542,8 +1549,14 @@ const RM_DIRS={5:"Directions: A word or phrase is missing in each of the sentenc
 function rmUnits(ex){const u=[],m=new Map();
   ex.qs.forEach((q,i)=>{const k=q.p===undefined?"p5":q.p;if(!m.has(k)){m.set(k,{k,part:q.part,idx:[]});u.push(m.get(k))}m.get(k).idx.push(i)});return u}
 function rmState(ex){if(!st.rm||typeof st.rm!=="object")st.rm={};return st.rm[ex.id]}
-// 交卷過，或別台裝置同步來的作答紀錄，都算檢討模式
-function rmReview(ex){const r=rmState(ex);return !!(r&&r.sub)||ex.qs.some((q,i)=>st.ans[ex.id+"-"+i]!==undefined)}
+function rmMode(ex){const r=rmState(ex);return r&&r.mode||""}
+function rmPrac(ex){return rmMode(ex)==="p"}
+function rmCurUnit(ex){const u=rmUnits(ex),cur=st.cur[ex.id]||0;return u.find(x=>x.idx.includes(cur))||u[0]}
+// 寫一題檢討一題的計時：目前這一頁還沒批改的題目；每批改一題就重新計時（Part 5 一題一題算，Part 6／7 整組算）
+function rmTimeKey(ex){if(!rmPrac(ex))return null;const U=rmCurUnit(ex),n=U.idx.filter(i=>st.ans[ex.id+"-"+i]!==undefined).length;
+  return n<U.idx.length?"rmu|"+ex.id+"|"+U.k+"|"+n:null}
+// 交卷過，或別台裝置同步來的作答紀錄，都算檢討模式（寫一題檢討一題是逐題／逐組檢討，不算）
+function rmReview(ex){if(rmPrac(ex))return false;const r=rmState(ex);return !!(r&&r.sub)||ex.qs.some((q,i)=>st.ans[ex.id+"-"+i]!==undefined)}
 function rmLeft(ex){const r=rmState(ex);return r&&r.t0?Math.max(0,RM_MS-(now()-r.t0)):RM_MS}
 function rmSubmit(ex,auto){
   if(!st.p7d||typeof st.p7d!=="object")st.p7d={};
@@ -1590,22 +1603,30 @@ function rmSegs(src,seg){
   if(!gapOk(src.slice(pos)))return null;
   return {en:{t:src,r:er},zh:{t:zt+src.slice(pos),r:zr}}}
 function vRMock(){
-  const ex=findEx(st.exam),units=rmUnits(ex),r=rmState(ex),review=rmReview(ex);if(!st.p7d||typeof st.p7d!=="object")st.p7d={};
+  const ex=findEx(st.exam),units=rmUnits(ex),r=rmState(ex),review=rmReview(ex),prac=rmPrac(ex);if(!st.p7d||typeof st.p7d!=="object")st.p7d={};
   if(rmTabEx!==ex.id){rmTabEx=ex.id;p7Tab="q"}   // p7Tab 和 vReading 共用：換進另一份模擬考（含從練習頁進來）一律先看「題目檢討」
-  if(!review&&!(r&&r.t0))return `${backHome}<h1>${esc(ex.title)}</h1><p class="sub">${esc(ex.sub||"")}</p>
-    <div class="panel" style="margin-top:22px"><p style="margin-top:0">Part 5 單句填空 30 題、Part 6 段落填空 16 題、Part 7 閱讀測驗 54 題，共 100 題，限時 75 分鐘。</p>
-    <ul class="note" style="padding-left:18px"><li>按「開始作答」後開始倒數，離開網頁也會繼續計時；時間到自動交卷。</li><li>作答中不顯示答案，交卷後才批改，並顯示翻譯與詳解。</li><li>上方可隨時切換 Part 與題組，選過的答案會保留。</li></ul>
-    <button class="btn primary" data-act="rmstart">開始作答（75 分鐘）</button></div>`;
-  const id=i=>ex.id+"-"+i,ans=i=>st.ans[id(i)],sel=i=>review?ans(i):st.p7d[id(i)],okI=i=>ans(i)!==undefined&&okAns(ex.qs[i],ans(i));
+  if(!review&&!(r&&(r.t0||r.mode)))return `${backHome}<h1>${esc(ex.title)}</h1>
+    <div class="panel" style="margin-top:22px"><p style="margin-top:0">Part 5 單句填空 30 題、Part 6 段落填空 16 題、Part 7 閱讀測驗 54 題，共 100 題。請選擇作答方式：</p>
+    <div class="rm-modes">
+      <div class="rm-mode"><h3>限時模擬</h3><ul class="note"><li>限時 75 分鐘，按下開始就倒數，離開網頁也會繼續計時；時間到自動交卷。</li><li>作答中不顯示答案，整份交卷後才批改，並顯示翻譯與詳解。</li><li>上方可隨時切換 Part 與題組，選過的答案會保留。</li></ul>
+        <button class="btn primary" data-act="rmstart" data-m="t">開始限時模擬（75 分鐘）</button></div>
+      <div class="rm-mode"><h3>寫一題檢討一題</h3><ul class="note"><li>不限時。</li><li>Part 5 選了答案就馬上批改；Part 6／7 一個題組的題目都選完，按「對答案」一起批改。</li><li>批改後就能看翻譯、詳解與全文逐句對照。</li></ul>
+        <button class="btn" data-act="rmstart" data-m="p">開始寫一題檢討一題</button></div>
+    </div></div>`;
+  const id=i=>ex.id+"-"+i,ans=i=>st.ans[id(i)],sel=i=>review||ans(i)!==undefined?ans(i):st.p7d[id(i)],okI=i=>ans(i)!==undefined&&okAns(ex.qs[i],ans(i));
+  // 這個題組（Part 5 是那一題）批改了沒：限時模擬看整份交卷；寫一題檢討一題看該組每題都有作答紀錄
+  const uRev=u=>review||(prac&&u.idx.every(i=>ans(i)!==undefined));
   let cur=st.cur[ex.id]||0;if(cur<0||cur>=ex.qs.length)cur=0;
-  let ui=units.findIndex(u=>u.idx.includes(cur));if(ui<0)ui=0;const U=units[ui];
-  const done=ex.qs.filter((q,i)=>sel(i)!==undefined).length,ok=ex.qs.filter((q,i)=>okI(i)).length;
-  const chip=(u,k)=>{const n=u.idx.length,d=u.idx.filter(i=>sel(i)!==undefined).length;
-    return `<button class="setchip ${k===ui?"cur":""} ${d===n?"done":""}" data-act="rmgo" data-i="${u.idx[0]}">${u.k==="p5"?"Part 5":ex.qs[u.idx[0]].n+"–"+ex.qs[u.idx[n-1]].n}<small>${review?u.idx.filter(okI).length:d}/${n}</small></button>`};
+  let ui=units.findIndex(u=>u.idx.includes(cur));if(ui<0)ui=0;const U=units[ui],urev=uRev(U);
+  const done=ex.qs.filter((q,i)=>sel(i)!==undefined).length,ok=ex.qs.filter((q,i)=>okI(i)).length,graded=ex.qs.filter((q,i)=>ans(i)!==undefined).length;
+  const chip=(u,k)=>{const n=u.idx.length,d=u.idx.filter(i=>sel(i)!==undefined).length,ur=uRev(u);
+    return `<button class="setchip ${k===ui?"cur":""} ${d===n?"done":""}" data-act="rmgo" data-i="${u.idx[0]}">${u.k==="p5"?"Part 5":ex.qs[u.idx[0]].n+"–"+ex.qs[u.idx[n-1]].n}<small>${ur?u.idx.filter(okI).length:d}/${n}</small></button>`};
   const nav=[5,6,7].map(pt=>`<span class="rm-pl">P${pt}</span>`+units.map((u,k)=>u.part===pt?chip(u,k):"").join("")).join("");
-  const bar=review?`<span class="rm-score">答對 <b>${ok}</b>／${ex.qs.length}</span>${[5,6,7].map(pt=>{const ii=ex.qs.map((q,i)=>q.part===pt?i:-1).filter(i=>i>=0);return `<span class="note">P${pt} ${ii.filter(okI).length}/${ii.length}</span>`}).join("")}<button class="btn" data-act="rmredo">重新作答</button>`
+  const partOk=[5,6,7].map(pt=>{const ii=ex.qs.map((q,i)=>q.part===pt?i:-1).filter(i=>i>=0);return `<span class="note">P${pt} ${ii.filter(okI).length}/${prac?ii.filter(i=>ans(i)!==undefined).length:ii.length}</span>`}).join("");
+  const bar=prac?`<span class="rm-score">答對 <b>${ok}</b>／已批改 ${graded}</span>${partOk}<span class="note">${timerChip()}</span><button class="btn" data-act="rmredo">重新作答</button>`
+    :review?`<span class="rm-score">答對 <b>${ok}</b>／${ex.qs.length}</span>${partOk}<button class="btn" data-act="rmredo">重新作答</button>`
     :`<span class="rm-time" id="rmtimer" title="剩餘時間">${fmtDur(rmLeft(ex))}</span><span class="note">已作答 ${done}／${ex.qs.length}</span><button class="btn primary" data-act="rmsubmit">交卷</button>`;
-  const qBlock=i=>{const q=ex.qs[i],qid=id(i),a=ans(i),s=sel(i),fl=!!st.flags[qid],P5=q.part===5;
+  const qBlock=i=>{const q=ex.qs[i],qid=id(i),a=ans(i),s=sel(i),fl=!!st.flags[qid],P5=q.part===5,review=P5&&prac?a!==undefined:urev;
     let b=`<div class="rq" id="rq-${q.n}" data-qid="${esc(qid)}"><div class="qtop"><span class="qno">${q.part===6?`<button class="linkbtn qlocate" data-act="jumpblank" data-n="${q.n}" title="找到空格">${q.n}.</button>`:q.n+"."}${review?`<span class="chip">${TAGS[q.g]?TAGS[q.g].n:""}</span>`:""}</span>
       <div class="qactions">${review?`<button class="copybtn" data-act="copy" data-id="${qid}" title="複製此題、選項與解析">複製</button>`:""}<button class="flagbtn ${fl?"on":""}" data-act="flag" data-id="${qid}" aria-pressed="${fl}">${fl?"已標註":"標註"}</button></div></div>`;
     if(q.q)b+=`<p class="qtext rq-text"${review&&P5?` data-fill="${esc(q.o[q.a])}"`:""}>${review?glossHTML(q.q,P5?q.o[q.a]:undefined):esc(q.q)}</p>`;
@@ -1624,18 +1645,20 @@ function vRMock(){
   if(U.k==="p5")return h+`<div class="reading one"><div class="pane-r" id="paneR" data-key="${ex.id}:p5"><p class="dirs">${RM_DIRS[5]}</p>${U.idx.map(qBlock).join("")}${pager}</div></div>`;
   const P=ex.passages[U.k]||{},docs=P.docs&&P.docs.length?P.docs:[{text:P.text}];
   const blank=n=>{const qi=ex.qs.findIndex(x=>x.n===n);if(qi<0)return `(${n})`;const qq=ex.qs[qi];
-    return review?`<span class="blank done ${ans(qi)===qq.a?"":"miss"}" id="blank-${n}" data-act="jumpq" data-n="${n}"><sup class="bn">${n}</sup>${glossHTML(qq.o[qq.a])}</span>`
+    return urev?`<span class="blank done ${ans(qi)===qq.a?"":"miss"}" id="blank-${n}" data-act="jumpq" data-n="${n}"><sup class="bn">${n}</sup>${glossHTML(qq.o[qq.a])}</span>`
       :`<span class="blank6" id="blank-${n}" data-act="jumpq" data-n="${n}"><sup class="bn">${n}</sup>-------</span>`};
-  // 逐句對照：交卷後，且這一組每一篇都有 seg 並對得上原文才啟用；否則沿用整段 trans
-  const sp=review?(P.docs&&P.docs.length?P.docs:[P]).map(d=>rmSegs(d.text||"",d.seg)):[],hasTr=sp.length>0&&sp.every(Boolean);
-  const tab=review&&(P.trans||hasTr)?p7Tab:"q";
-  h+=`<div class="reading"><div class="pane-l" id="paneL" data-key="${ex.id}:${U.k}"><p class="dirs">${RM_DIRS[U.part]}</p><p class="pane-title">${esc(P.en||"")}</p>${docs.map((d,di)=>`<div class="doc"><div class="p-body">${rmText(d.text,review,blank,hasTr?{r:sp[di].en.r,key:"t"+di}:null)}</div></div>`).join("")}</div>
+  // 逐句對照：批改後（限時模擬是交卷後），且這一組每一篇都有 seg 並對得上原文才啟用；否則沿用整段 trans
+  const sp=urev?(P.docs&&P.docs.length?P.docs:[P]).map(d=>rmSegs(d.text||"",d.seg)):[],hasTr=sp.length>0&&sp.every(Boolean);
+  const tab=urev&&(P.trans||hasTr)?p7Tab:"q";
+  h+=`<div class="reading"><div class="pane-l" id="paneL" data-key="${ex.id}:${U.k}"><p class="dirs">${RM_DIRS[U.part]}</p><p class="pane-title">${esc(P.en||"")}</p>${docs.map((d,di)=>`<div class="doc"><div class="p-body">${rmText(d.text,urev,blank,hasTr?{r:sp[di].en.r,key:"t"+di}:null)}</div></div>`).join("")}</div>
   <div class="pane-r" id="paneR">`;
-  if(review&&(P.trans||hasTr))h+=`<div class="ptabs" role="tablist">${[["q","題目檢討"],["tr","全文翻譯"]].map(([k,n])=>`<button role="tab" aria-selected="${tab===k}" class="${tab===k?"on":""}" data-act="p7tab" data-t="${k}">${n}</button>`).join("")}</div>`;
+  if(urev&&(P.trans||hasTr))h+=`<div class="ptabs" role="tablist">${[["q","題目檢討"],["tr","全文翻譯"]].map(([k,n])=>`<button role="tab" aria-selected="${tab===k}" class="${tab===k?"on":""}" data-act="p7tab" data-t="${k}">${n}</button>`).join("")}</div>`;
   h+=tab==="tr"?(hasTr?`<p class="note trhint">滑鼠移到英文句子上，這裡會標示對應的翻譯；手機可以直接點句子。</p>`+sp.map((s,di)=>`<div class="doc trdoc"><div class="p-body">${rmText(s.zh.t,false,null,{r:s.zh.r,key:"t"+di})}</div></div>`).join(""):`<div class="doc trdoc"><div class="p-body">${rmText(P.trans,false)}</div></div>`)+`${P.voc?`<p class="note"><strong>詞彙：</strong>${esc(P.voc)}</p>`:""}`:U.idx.map(qBlock).join("");
+  if(prac&&!urev){const f=U.idx.filter(i=>sel(i)!==undefined).length;
+    h+=`<div class="submitbar"><span class="note">已選 ${f}／${U.idx.length} 題${f<U.idx.length?"．全部選完才能對答案":""}</span><button class="btn primary" data-act="rmcheck" ${f<U.idx.length?"disabled":""}>對答案</button></div>`}
   return h+pager+`</div></div>`;
 }
-setInterval(()=>{const el=document.getElementById("rmtimer");if(!el||st.view!=="exam")return;const ex=findEx(st.exam);if(!ex||ex.mock!=="reading"||rmReview(ex))return;
+setInterval(()=>{const el=document.getElementById("rmtimer");if(!el||st.view!=="exam")return;const ex=findEx(st.exam);if(!ex||ex.mock!=="reading"||rmPrac(ex)||rmReview(ex))return;
   const left=rmLeft(ex);el.textContent=fmtDur(left);el.classList.toggle("low",left<5*60e3);
   if(left<=0&&rmSubmit(ex,true)){showToast("時間到，已自動交卷");p7ResetR=true;render()}},1000);
 /* ---------- TOEIC 聽力測驗（Part 1–4 與聽力模擬考）：整段音檔連續播完、批次勾選後交卷檢討 ---------- */
@@ -1651,7 +1674,9 @@ let lSetPage={},lWide=false,lHideTr=(()=>{try{return localStorage.getItem("quiz-
 const lPageKey=ex=>ex.id+"|"+(ex.mock==="listening"?lPartTab:0);
 function lPaged(ex){const vis=lVisIdx(ex);return lClipOn(ex)&&vis.length>0&&vis.every(i=>ex.qs[i].s!==undefined)}
 const lHasClips=ex=>!!ex&&(ex.qs.some(q=>q.t)||(ex.sets||[]).some(s=>s.t));
-const lClipOn=ex=>lClipMode&&lHasClips(ex);
+// 聽力模擬考開始前選的模式（st.rm[試卷id].mode：t＝整段一次寫完、p＝逐題播放）優先；沒選過（舊紀錄）才用上次的播放方式
+const lMockMode=ex=>ex&&ex.mock==="listening"?rmMode(ex):"";
+const lClipOn=ex=>(lMockMode(ex)?lMockMode(ex)==="p":lClipMode)&&lHasClips(ex);
 function lClipSrc(ex,q){  // {id 片段代表題（題組第一題）, mkey, raw, r:[開始,結束]}；沒有時戳回傳 null
   const S=q.s!==undefined&&ex.sets?ex.sets[q.s]:null,o=S||q;
   const pa=ex.partAudios?ex.partAudios[q.part]||{}:ex;
@@ -1938,7 +1963,17 @@ function lUpdateDom(ex){
 }
 function vListening(){
   const ex=findEx(st.exam);if(!st.p7d||typeof st.p7d!=="object")st.p7d={};
-  if(lLastEx!==ex.id){lLastEx=ex.id;lPartTab=ex.mock==="listening"?1:0;lAccAlt=false}
+  const mm=lMockMode(ex),anyAns=ex.qs.some((q,i)=>st.ans[ex.id+"-"+i]!==undefined);
+  if(ex.mock==="listening"&&!mm&&!anyAns&&!ex.qs.some((q,i)=>st.p7d[ex.id+"-"+i]!==undefined))
+    return `${backHome}<h1>${esc(ex.title)}</h1>
+    <div class="panel" style="margin-top:22px"><p style="margin-top:0">Part 1 照片描述 6 題、Part 2 應答問題 25 題、Part 3 簡短對話 39 題、Part 4 簡短獨白 30 題，共 100 題。請選擇作答方式：</p>
+    <div class="rm-modes">
+      <div class="rm-mode"><h3>整回模擬</h3><ul class="note"><li>整段音檔從頭播到尾（約 45 分鐘），建議和正式考試一樣中途不暫停、不倒轉。</li><li>作答中不顯示答案，音檔播完自動交卷，也可以提早交卷。</li></ul>
+        <button class="btn primary" data-act="lmstart" data-m="t">開始整回模擬</button></div>
+      ${lHasClips(ex)?`<div class="rm-mode"><h3>寫一題檢討一題</h3><ul class="note"><li>每題（Part 3／4 每個題組）有自己的播放鍵，可以重聽。</li><li>Part 1／2 選了答案就馬上批改；Part 3／4 題組三題都選完一起批改，並顯示原文、翻譯與詳解。</li></ul>
+        <button class="btn" data-act="lmstart" data-m="p">開始寫一題檢討一題</button></div>`:""}
+    </div></div>`;
+  if(lLastEx!==ex.id){lLastEx=ex.id;lPartTab=ex.mock==="listening"?(mm==="t"?0:1):0;lAccAlt=false}
   const vis=lVisIdx(ex);
   let audRel=ex.audio,altRel=ex.audioAlt;
   if(ex.mock==="listening"&&lPartTab>0&&ex.partAudios&&ex.partAudios[lPartTab]){
@@ -1960,12 +1995,12 @@ function vListening(){
     cells+=`<button class="${c}" data-act="lgoto" data-i="${i}" data-cell="${id}" aria-label="第 ${q.n||i+1} 題">${q.n||i+1}</button>`;
   });
   let h=`${backHome}<h1>${esc(ex.title)}</h1>`;
-  if(ex.mock==="listening"){
+  if(ex.mock==="listening"&&!(mm==="t"&&!anyAns)){  // 整回模擬交卷前只顯示整回，切 Part 會換掉播放中的音檔
     const tabs=[[1,"Part 1 (1–6)"],[2,"Part 2 (7–31)"],[3,"Part 3 (32–70)"],[4,"Part 4 (71–100)"],[0,"整回 (1–100)"]];
     h+=`<div class="chips" role="tablist" aria-label="大題切換">${tabs.map(([k,n])=>`<button role="tab" aria-selected="${lPartTab===k}" class="${lPartTab===k?"on":""}" data-act="lpart" data-p="${k}">${n}</button>`).join("")}</div>`;
   }
   const clip=lClipOn(ex);
-  const modeChips=lHasClips(ex)?`<button class="${clip?"on":""}" data-act="lmode" data-m="1">逐題播放</button><button class="${clip?"":"on"}" data-act="lmode" data-m="0">整段播放</button>`:"";
+  const modeChips=lHasClips(ex)&&!mm?`<button class="${clip?"on":""}" data-act="lmode" data-m="1">逐題播放</button><button class="${clip?"":"on"}" data-act="lmode" data-m="0">整段播放</button>`:"";
   const hasAlt=clip?ex.qs.some(q=>q.tA)||(ex.sets||[]).some(s=>s.tA):!!altRel;  // 模擬考整回沒有整段口音版，但逐題片段有
   const accChips=hasAlt?`<button class="${!lAccAlt?"on":""}" data-act="lacc" data-alt="0">標準音檔</button><button class="${lAccAlt?"on":""}" data-act="lacc" data-alt="1">英／澳口音版</button>`:"";
   if(clip){
@@ -2676,10 +2711,19 @@ document.addEventListener("click",e=>{
     case"jumpblank":{const el=document.getElementById("blank-"+d.n),pl=document.getElementById("paneL");
       if(el&&pl){pl.scrollTop+=el.getBoundingClientRect().top-pl.getBoundingClientRect().top-pl.clientHeight/3;el.classList.add("flash");setTimeout(()=>el.classList.remove("flash"),1200)}return}
     case"p7tab":p7Tab=d.t==="tr"?"tr":"q";p7ResetR=true;render();return;
-    case"rmstart":if(!st.rm||typeof st.rm!=="object")st.rm={};st.rm[ex.id]={t0:now()};st.cur[ex.id]=0;p7Tab="q";save();render();window.scrollTo(0,0);return;
+    case"rmstart":if(!st.rm||typeof st.rm!=="object")st.rm={};st.rm[ex.id]=d.m==="p"?{mode:"p"}:{mode:"t",t0:now()};st.cur[ex.id]=0;p7Tab="q";save();render();window.scrollTo(0,0);return;
     case"rmgo":{if(+d.i<0)return;st.cur[ex.id]=+d.i;p7Tab="q";save();render();window.scrollTo(0,0);
       const l=document.getElementById("paneL"),r=document.getElementById("paneR");if(l)l.scrollTop=0;if(r)r.scrollTop=0;return}
-    case"rmpick":if(rmReview(ex))return;if(!st.p7d||typeof st.p7d!=="object")st.p7d={};st.p7d[d.id]=+d.k;persist();render();return;
+    case"rmpick":{if(rmReview(ex)||st.ans[d.id]!==undefined)return;if(!st.p7d||typeof st.p7d!=="object")st.p7d={};
+      const q=QM[d.id].q;
+      if(rmPrac(ex)&&q.part===5){  // 寫一題檢討一題：Part 5 選了就批改
+        const ms=elapsedFor(rmTimeKey(ex));setAns(d.id,+d.k);logTime(d.id,ms,okAns(q,+d.k),{src:"e"});delete st.p7d[d.id];QT.key=null;save();render();return}
+      st.p7d[d.id]=+d.k;persist();render();return}
+    case"rmcheck":{const U=rmCurUnit(ex),ids=U.idx.map(i=>ex.id+"-"+i);if(!st.p7d||typeof st.p7d!=="object")st.p7d={};
+      if(!rmPrac(ex)||ids.some(x=>st.ans[x]===undefined&&st.p7d[x]===undefined))return;
+      const ms=elapsedFor(rmTimeKey(ex)),newIds=ids.filter(x=>st.ans[x]===undefined),per=ms!=null&&newIds.length?ms/newIds.length:null;
+      newIds.forEach(x=>{setAns(x,st.p7d[x]);logTime(x,per,okAns(QM[x].q,st.p7d[x]),{src:"e",set:newIds.length,sm:ms==null?null:Math.round(ms)})});
+      ids.forEach(x=>{delete st.p7d[x]});QT.key=null;p7ResetR=true;p7Tab="q";save();render();const pr=document.getElementById("paneR");if(pr)pr.scrollTop=0;return}
     case"rmsubmit":if(!rmSubmit(ex,false))return;p7ResetR=true;p7Tab="q";render();return;
     case"rmredo":if(!confirm("清除這份模擬考的作答紀錄，重新作答？標註與筆記會保留。"))return;
       ex.qs.forEach((q,i)=>{delAns(ex.id+"-"+i);if(st.p7d)delete st.p7d[ex.id+"-"+i]});if(st.rm)delete st.rm[ex.id];st.cur[ex.id]=0;save();render();return;
@@ -2723,6 +2767,8 @@ document.addEventListener("click",e=>{
     case"ltr":{lHideTr=!lHideTr;try{localStorage.setItem("quiz-lhidetr",lHideTr?"1":"0")}catch(err){}
       document.body.classList.toggle("l-notr",lHideTr);app.querySelectorAll('[data-act="ltr"]').forEach(b=>{b.textContent=lHideTr?"顯示翻譯":"隱藏翻譯"});return}
     case"lpart":{lPartTab=+d.p;render();window.scrollTo(0,0);return}
+    case"lmstart":{if(!st.rm||typeof st.rm!=="object")st.rm={};st.rm[ex.id]={mode:d.m==="p"?"p":"t"};
+      lLastEx=ex.id;lPartTab=d.m==="p"?1:0;lAccAlt=false;lClipStop();save();render();window.scrollTo(0,0);return}
     case"lacc":{lAccAlt=d.alt==="1";lClipStop();render();return}
     case"lmode":{lClipMode=d.m==="1";try{localStorage.setItem("quiz-lclip",lClipMode?"1":"0")}catch(err){}
       lClipStop();const la=document.getElementById("laudio");if(la)la.pause();render();return}
